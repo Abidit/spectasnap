@@ -1,11 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false, // avoid double-init of MediaPipe
-  webpack: (config) => {
-    // Ignore MediaPipe WASM binary warnings
-    config.resolve.fallback = { fs: false, path: false };
-    return config;
-  },
+  turbopack: {},          // opt-in to Turbopack, silence warning
   async headers() {
     return [
       {
