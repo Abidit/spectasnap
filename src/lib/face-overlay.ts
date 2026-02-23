@@ -38,7 +38,14 @@ export function drawGlassesOnCanvas(
 
   const eyeMidX = (leftOuter.x + rightOuter.x) / 2;
   const eyeMidY = (leftOuter.y + rightOuter.y) / 2;
-  const angle   = Math.atan2(rightOuter.y - leftOuter.y, rightOuter.x - leftOuter.x);
+  let eyeDx = rightOuter.x - leftOuter.x;
+  let eyeDy = rightOuter.y - leftOuter.y;
+  // Keep a stable left->right vector in mirrored space to avoid PI flips.
+  if (eyeDx < 0) {
+    eyeDx = -eyeDx;
+    eyeDy = -eyeDy;
+  }
+  const angle = Math.atan2(eyeDy, eyeDx);
 
   const cx = eyeMidX + Math.sin(angle) * glassesH * frame.yOffset;
   const cy = eyeMidY - Math.cos(angle) * glassesH * frame.yOffset;

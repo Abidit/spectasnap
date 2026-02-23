@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, CameraOff, Loader2, AlertCircle } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
+import ThreeOverlay from '@/components/ThreeOverlay';
+import { computeTransform, smooth, type FaceTransform } from '@/ar/pose';
 
 type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'error';
 
@@ -17,6 +19,9 @@ const MEDIAPIPE_WASM =
 const MEDIAPIPE_MODEL =
   'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
+const FACE_HOLD_MS = 500; // hold last position this long after face disappears
+const FACE_FADE_MS = 300; // then fade to transparent over this duration
+
 export default function ARCamera({ selectedGlasses }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,6 +30,9 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
   const rafRef = useRef<number>(0);
   const glassesImgRef = useRef<HTMLImageElement | null>(null);
   const lastFrameTimeRef = useRef<number>(-1);
+  const smoothedTransformRef = useRef<FaceTransform | null>(null);
+  const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
+  const faceLastSeenRef = useRef<number>(-Infinity);
 
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -42,6 +50,8 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
     cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    smoothedTransformRef.current = null;
+    faceLastSeenRef.current = -Infinity;
   }, []);
 
   const renderLoop = useCallback(() => {
@@ -82,7 +92,9 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
       const result = landmarker.detectForVideo(video, now);
 
       if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+        faceLastSeenRef.current = now;
         setFaceDetected(true);
+
         const img = glassesImgRef.current;
         if (img) {
           drawGlassesOnCanvas(
@@ -94,8 +106,35 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
             canvas.height,
           );
         }
+
+        // ── 3-D glasses tracking ─────────────────────────────────────────
+        const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
+        const prev = smoothedTransformRef.current ?? raw;
+        // position/scale lerp 0.18, rotation lerp 0.12
+        const smoothed = smooth(prev, raw, 0.18, 0.12);
+        smoothedTransformRef.current = smoothed;
+        threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
+        threeSceneRef.current?.updateFaceOccluder(result.faceLandmarks[0], canvas.width, canvas.height);
+        threeSceneRef.current?.setModelOpacity(1);
       } else {
         setFaceDetected(false);
+        threeSceneRef.current?.clearFaceOccluder();
+
+        // ── Stability: hold 500 ms, then fade over 300 ms ─────────────────
+        const elapsed = now - faceLastSeenRef.current;
+        if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformRef.current) {
+          threeSceneRef.current?.applyFaceTransform(
+            smoothedTransformRef.current,
+            canvas.width,
+            canvas.height,
+          );
+          const opacity = elapsed < FACE_HOLD_MS
+            ? 1
+            : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
+          threeSceneRef.current?.setModelOpacity(opacity);
+        } else {
+          threeSceneRef.current?.setModelOpacity(0);
+        }
       }
     } catch {
       // Detection may fail on first frames; keep looping
@@ -161,6 +200,10 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
       }
     }
 
+    // Pre-load the Three.js scene module so applyFaceTransform is available
+    // from the first rendered frame (non-blocking; overlay init runs in parallel).
+    threeSceneRef.current = await import('@/ar/threeScene');
+
     setStatus('ready');
     rafRef.current = requestAnimationFrame(renderLoop);
   }, [renderLoop]);
@@ -172,6 +215,11 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
       rafRef.current = requestAnimationFrame(renderLoop);
     }
   }, [renderLoop, status]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    void threeSceneRef.current?.selectModel(selectedGlasses.id);
+  }, [selectedGlasses.id, status]);
 
   useEffect(() => {
     return () => {
@@ -197,6 +245,9 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
         className="w-full h-full object-cover"
         style={{ display: status === 'ready' ? 'block' : 'none' }}
       />
+
+      {/* Three.js WebGL overlay — transparent, on top of 2D canvas */}
+      <ThreeOverlay enabled={status === 'ready'} />
 
       {/* Idle / permission prompt */}
       <AnimatePresence>
