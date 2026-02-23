@@ -1,7 +1,6 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Heart, Star } from 'lucide-react';
 import { useState } from 'react';
 import type { GlassesFrame } from '@/lib/glasses-data';
 
@@ -9,114 +8,127 @@ interface ProductCardProps {
   frame: GlassesFrame;
 }
 
-export default function ProductCard({ frame }: ProductCardProps) {
-  const [added, setAdded] = useState(false);
-  const [liked, setLiked] = useState(false);
+const ALL_OCCASIONS = ['Casual', 'Office', 'Wedding', 'Sports'] as const;
 
-  function handleAddToCart() {
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2200);
-  }
+export default function ProductCard({ frame }: ProductCardProps) {
+  const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={frame.id}
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.22 }}
-        className="flex flex-col gap-4"
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.2 }}
+        className="flex flex-col gap-5"
       >
-        {/* Brand + style tag */}
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-zinc-400 text-xs uppercase tracking-widest">{frame.brand}</p>
-            <h3 className="text-white text-xl font-semibold mt-0.5">{frame.name}</h3>
-          </div>
-          <button
-            onClick={() => setLiked((v) => !v)}
-            className="p-2 rounded-full border border-brand-border hover:border-red-500/50 transition-colors"
-          >
-            <Heart
-              className={`w-4 h-4 transition-colors ${liked ? 'fill-red-500 text-red-500' : 'text-zinc-400'}`}
-            />
-          </button>
-        </div>
-
-        {/* Style chip */}
-        <div className="flex items-center gap-2">
+        {/* Frame name + style tag */}
+        <div>
           <span
-            className="px-3 py-1 rounded-full text-xs font-medium border"
-            style={{
-              color: frame.color,
-              borderColor: frame.color + '55',
-              backgroundColor: frame.color + '15',
-            }}
+            className="text-[10px] font-sans font-semibold tracking-[0.14em] uppercase"
+            style={{ color: '#C9A96E' }}
           >
+            {frame.styleTag}
+          </span>
+          <h3 className="font-serif text-2xl font-semibold text-brand-text mt-1 leading-tight">
+            {frame.name}
+          </h3>
+          <p className="text-brand-muted text-xs font-sans mt-0.5 uppercase tracking-wider">
             {frame.style}
-          </span>
-          <span className="flex items-center gap-1 text-amber-400 text-xs">
-            <Star className="w-3 h-3 fill-amber-400" />
-            <span>4.8</span>
-            <span className="text-zinc-500">(214)</span>
-          </span>
+          </p>
         </div>
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-white">${frame.price}</span>
-          <span className="text-zinc-500 text-sm line-through">
-            ${Math.round(frame.price * 1.3)}
-          </span>
-          <span className="text-emerald-400 text-xs font-medium">23% off</span>
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* Best for */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            Best For
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {frame.bestFor.map((shape) => (
+              <span
+                key={shape}
+                className="px-2.5 py-1 text-xs font-sans font-medium text-brand-text
+                           bg-brand-secondary border border-brand-border"
+                style={{ borderRadius: 2 }}
+              >
+                {shape}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* Color swatch */}
-        <div className="flex items-center gap-2">
-          <span className="text-zinc-400 text-xs">Color:</span>
-          <button
-            className="w-6 h-6 rounded-full border-2 border-brand-gold ring-2 ring-brand-gold/30"
-            style={{ backgroundColor: frame.color }}
-          />
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* Occasion */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            Occasion
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ALL_OCCASIONS.map((occ) => {
+              const supported = frame.occasions.includes(occ);
+              const isActive  = activeOccasion === occ;
+              return (
+                <button
+                  key={occ}
+                  onClick={() => setActiveOccasion(isActive ? null : occ)}
+                  disabled={!supported}
+                  className="px-2.5 py-1 text-xs font-sans font-medium transition-all duration-150"
+                  style={{
+                    borderRadius: 2,
+                    border: isActive
+                      ? '1px solid #C9A96E'
+                      : '1px solid #DDD8CE',
+                    backgroundColor: isActive
+                      ? 'rgba(201,169,110,0.12)'
+                      : supported
+                        ? '#FDFAF4'
+                        : '#EDE8DC',
+                    color: isActive
+                      ? '#A8844A'
+                      : supported
+                        ? '#1A1612'
+                        : '#B0ABA6',
+                    cursor: supported ? 'pointer' : 'default',
+                  }}
+                >
+                  {occ}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Add to cart */}
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* Staff note */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            Staff Note
+          </p>
+          <p className="text-brand-text text-sm font-sans leading-relaxed italic">
+            &ldquo;{frame.staffNote}&rdquo;
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* CTA */}
         <button
-          onClick={handleAddToCart}
-          className="relative w-full py-3 rounded-full font-semibold text-sm overflow-hidden
-                     bg-brand-gold text-black hover:bg-amber-400 active:scale-[0.98]
-                     transition-all duration-150 shadow-gold-sm"
+          className="w-full py-3 font-sans font-semibold text-sm tracking-wide
+                     bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
+                     transition-all duration-150"
+          style={{ borderRadius: 2 }}
         >
-          <AnimatePresence mode="wait">
-            {added ? (
-              <motion.span
-                key="added"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -20, opacity: 0 }}
-                className="flex items-center justify-center gap-2"
-              >
-                ✓ Added to Bag
-              </motion.span>
-            ) : (
-              <motion.span
-                key="add"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -20, opacity: 0 }}
-                className="flex items-center justify-center gap-2"
-              >
-                <ShoppingBag className="w-4 h-4" /> Add to Bag
-              </motion.span>
-            )}
-          </AnimatePresence>
+          Ask Staff for This Frame
         </button>
-
-        {/* Free trial note */}
-        <p className="text-zinc-500 text-[11px] text-center">
-          Free 14-day home trial · Free returns
-        </p>
       </motion.div>
     </AnimatePresence>
   );

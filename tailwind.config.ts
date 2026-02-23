@@ -6,20 +6,31 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          gold: '#F59E0B',
-          dark: '#0A0A0F',
-          surface: '#12121A',
-          card: '#1A1A28',
-          border: '#2A2A3A',
+          // Light UI palette
+          page:      '#F5F0E8',
+          panel:     '#FDFAF4',
+          secondary: '#EDE8DC',
+          text:      '#1A1612',
+          muted:     '#6B6560',
+          gold:      '#C9A96E',
+          'gold-dk': '#A8844A',
+          border:    '#DDD8CE',
+          // Camera viewport (stays dark)
+          camera:    '#0A0A0A',
+          // Selector overlay on camera
+          overlay:   'rgba(10,10,10,0.72)',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Playfair Display', 'Georgia', 'serif'],
+        serif:   ['Cormorant Garamond', 'Georgia', 'serif'],
+        sans:    ['DM Sans', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        sharp: '2px',
       },
       boxShadow: {
-        gold: '0 0 30px rgba(245,158,11,0.2)',
-        'gold-sm': '0 0 12px rgba(245,158,11,0.15)',
+        gold: '0 0 24px rgba(201,169,110,0.18)',
+        soft: '0 2px 16px rgba(26,22,18,0.08)',
       },
     },
   },

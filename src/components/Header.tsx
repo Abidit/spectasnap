@@ -1,30 +1,28 @@
 'use client';
 
-import { Glasses, Menu } from 'lucide-react';
+import { Glasses } from 'lucide-react';
 
 export default function Header() {
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-brand-border bg-brand-surface/80 backdrop-blur-md z-10">
+    <header className="flex items-center justify-between px-6 py-4 bg-brand-panel border-b border-brand-border z-10">
       {/* Logo */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-brand-gold/10 border border-brand-gold/30 flex items-center justify-center">
-          <Glasses className="w-4 h-4 text-brand-gold" />
+        <div className="w-7 h-7 flex items-center justify-center">
+          <Glasses className="w-5 h-5" style={{ color: '#C9A96E' }} />
         </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-white font-bold text-lg tracking-tight">Specta</span>
-          <span className="text-brand-gold font-bold text-lg tracking-tight">Snap</span>
+        <div className="flex items-baseline gap-0.5">
+          <span className="font-serif text-xl font-semibold tracking-tight text-brand-text">Specta</span>
+          <span className="font-serif text-xl font-semibold tracking-tight" style={{ color: '#C9A96E' }}>Snap</span>
         </div>
       </div>
 
-      {/* Tagline — hidden on small tablets */}
-      <p className="hidden sm:block text-zinc-500 text-xs tracking-widest uppercase">
+      {/* Tagline */}
+      <p className="hidden sm:block text-brand-muted text-xs tracking-widest uppercase font-sans">
         Virtual Try-On
       </p>
 
-      {/* Menu placeholder */}
-      <button className="p-2 rounded-lg border border-brand-border hover:border-zinc-600 transition-colors">
-        <Menu className="w-4 h-4 text-zinc-400" />
-      </button>
+      {/* Spacer to match layout */}
+      <div className="w-7" />
     </header>
   );
 }
