@@ -442,7 +442,7 @@ export function dispose(): void {
  * BASE_SCALE_FACTOR: multiplied against IPD-derived world scale.
  *   Increase to make glasses larger relative to the face, decrease to shrink.
  */
-const BASE_SCALE_FACTOR = 0.85;
+const BASE_SCALE_FACTOR = 0.72;
 // Global correction for meshes that are authored facing the opposite direction.
 const MODEL_BASE_ROTATION_Y = Math.PI;
 
@@ -510,7 +510,6 @@ export function updateTempleExtensions(
   _canvasW: number,
   _canvasH: number,
 ): void {
-  // Temples hidden — infrastructure preserved for re-enabling later.
   hideTemples();
 }
 
@@ -593,6 +592,10 @@ export function getActiveModel(): THREE.Group | null {
 
 export function getCamera(): THREE.PerspectiveCamera | null {
   return state?.camera ?? null;
+}
+
+export function getCanvas(): HTMLCanvasElement | null {
+  return state?.renderer.domElement ?? null;
 }
 
 export function getScene(): THREE.Scene | null {

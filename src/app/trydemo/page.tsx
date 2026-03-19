@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant } from '@/lib/glasses-data';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
@@ -14,9 +14,10 @@ export default function TryDemo() {
   const [selectedColor, setSelectedColor] = useState<ColorVariant | null>(null);
 
   // Reset color when switching frames so each frame shows its default look first
-  useEffect(() => {
+  function handleSelect(frame: GlassesFrame) {
+    setSelected(frame);
     setSelectedColor(null);
-  }, [selected.id]);
+  }
 
   return (
     <div
@@ -36,7 +37,7 @@ export default function TryDemo() {
               background: 'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0) 100%)',
             }}
           >
-            <GlassesGrid selected={selected} onSelect={setSelected} />
+            <GlassesGrid selected={selected} onSelect={handleSelect} />
           </div>
         </div>
 
@@ -75,9 +76,9 @@ export default function TryDemo() {
             </p>
           </div>
           <button
-            className="px-4 py-2 font-sans font-semibold text-xs tracking-wide
+            className="px-5 font-sans font-semibold text-xs tracking-wide
                        bg-brand-text text-brand-page hover:opacity-90 transition-opacity"
-            style={{ borderRadius: 2 }}
+            style={{ borderRadius: 2, minHeight: 44 }}
           >
             Ask Staff
           </button>
