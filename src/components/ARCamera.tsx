@@ -24,6 +24,17 @@ const MEDIAPIPE_MODEL =
 const FACE_HOLD_MS = 500; // hold last position this long after face disappears
 const FACE_FADE_MS = 300; // then fade to transparent over this duration
 
+// Suppress MediaPipe/TFLite internal INFO logs that surface via console.error
+// (e.g. "Created TensorFlow Lite XNNPACK delegate for CPU")
+if (typeof window !== 'undefined') {
+  const _origError = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const msg = String(args[0] ?? '');
+    if (msg.includes('TensorFlow Lite') || msg.includes('XNNPACK') || msg.includes('Created TensorFlow')) return;
+    _origError(...args);
+  };
+}
+
 export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,13 +87,17 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
       canvas.height = video.videoHeight;
     }
 
-    const now = performance.now();
-    // Throttle MediaPipe to avoid calling with same timestamp
-    if (now === lastFrameTimeRef.current) {
+    // Use video's own timestamp — detectForVideo requires a monotonically
+    // increasing value tied to the media stream, not wall-clock time.
+    const videoTimestampMs = video.currentTime * 1000;
+    if (videoTimestampMs === lastFrameTimeRef.current) {
+      // Same video frame — nothing new to detect, skip
       rafRef.current = requestAnimationFrame(renderLoop);
       return;
     }
-    lastFrameTimeRef.current = now;
+    lastFrameTimeRef.current = videoTimestampMs;
+
+    const now = performance.now();
 
     // Draw mirrored video frame
     ctx.save();
@@ -92,7 +107,7 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
 
     // Detect face landmarks (video mode uses timestamp)
     try {
-      const result = landmarker.detectForVideo(video, now);
+      const result = landmarker.detectForVideo(video, videoTimestampMs);
 
       if (result.faceLandmarks && result.faceLandmarks.length > 0) {
         faceLastSeenRef.current = now;
