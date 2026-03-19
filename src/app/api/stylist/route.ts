@@ -27,6 +27,10 @@ interface StylistResponse {
 }
 
 export async function POST(req: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set in environment' }, { status: 500 });
+  }
+
   const body = (await req.json()) as StylistRequest;
   const { occasion, faceShape, style, material, avoidColors, availableFrames } = body;
 
@@ -61,6 +65,6 @@ Respond with ONLY valid JSON in this exact format (no markdown, no extra text):
     const parsed = JSON.parse(text) as StylistResponse;
     return NextResponse.json(parsed);
   } catch {
-    return NextResponse.json({ error: 'Invalid response from AI' }, { status: 500 });
+    return NextResponse.json({ error: `AI returned unparseable response: ${text.slice(0, 200)}` }, { status: 500 });
   }
 }

@@ -57,6 +57,7 @@ function OptionButton({
 
 export default function AIStylePanel({ open, onClose, availableFrames, onRecommendation }: AIStylePanelProps) {
   const [step, setStep] = useState<Step>('q1');
+  const [errorMsg, setErrorMsg] = useState('');
   const [answers, setAnswers] = useState<Answers>({
     occasion: '',
     faceShape: '',
@@ -68,12 +69,14 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
 
   function reset() {
     setStep('q1');
+    setErrorMsg('');
     setAnswers({ occasion: '', faceShape: '', style: '', material: '', avoidColors: '' });
     setResult(null);
   }
 
   async function submit() {
     setStep('loading');
+    setErrorMsg('');
     try {
       const res = await fetch('/api/stylist', {
         method: 'POST',
@@ -84,7 +87,8 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
       if (data.error) throw new Error(data.error);
       setResult(data);
       setStep('result');
-    } catch {
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Unknown error');
       setStep('error');
     }
   }
@@ -331,7 +335,10 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
                     animate={{ opacity: 1 }}
                     className="flex flex-col items-center justify-center gap-4 py-16 text-center"
                   >
-                    <p className="font-sans text-sm text-brand-muted">Something went wrong. Please try again.</p>
+                    <p className="font-sans text-sm text-brand-muted">Something went wrong.</p>
+                    {errorMsg && (
+                      <p className="font-sans text-xs text-red-500 max-w-[280px] break-words">{errorMsg}</p>
+                    )}
                     <button
                       onClick={reset}
                       className="px-6 py-2.5 font-sans font-medium text-sm border border-brand-border
