@@ -27,12 +27,17 @@ export default function Header({ arStatus }: HeaderProps) {
         Virtual Try-On
       </p>
 
-      {/* AR status badge — or spacer to keep layout balanced */}
-      {arStatus ? (
-        <ARStatusBadge status={arStatus} />
-      ) : (
-        <div className="w-7" />
-      )}
+      {/* Right side: AR status badge + Dashboard nav link */}
+      <div className="flex items-center gap-4">
+        {arStatus && <ARStatusBadge status={arStatus} />}
+        <Link
+          href="/dashboard"
+          className="text-brand-muted text-xs font-sans font-medium hover:text-brand-gold transition-colors"
+          style={{ textDecoration: 'none' }}
+        >
+          Dashboard
+        </Link>
+      </div>
     </header>
   );
 }

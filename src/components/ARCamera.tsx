@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, AlertCircle, Download } from 'lucide-react';
+import { Loader2, AlertCircle, Download, Share2 } from 'lucide-react';
 import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
@@ -497,20 +497,39 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
         </div>
       )}
 
-      {/* Snapshot button — visible when tracking active */}
+      {/* Action buttons — visible when tracking active */}
       {status === 'ready' && faceDetected && (
-        <button
-          onClick={takeSnapshot}
-          className="absolute bottom-[100px] right-4 z-10 flex items-center gap-2
-                     bg-black/60 backdrop-blur-sm border border-white/15
-                     px-4 text-white/80 text-xs font-sans font-medium
-                     hover:border-brand-gold hover:text-brand-gold transition-colors"
-          style={{ borderRadius: 2, minHeight: 44 }}
-          title="Save look"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Save Look</span>
-        </button>
+        <div className="absolute bottom-[100px] right-4 z-10 flex flex-col gap-2">
+          {/* Save snapshot */}
+          <button
+            onClick={takeSnapshot}
+            className="flex items-center gap-2 bg-black/60 backdrop-blur-sm border border-white/15
+                       px-4 text-white/80 text-xs font-sans font-medium
+                       hover:border-brand-gold hover:text-brand-gold transition-colors"
+            style={{ borderRadius: 2, minHeight: 44 }}
+            title="Save look"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Save Look</span>
+          </button>
+          {/* WhatsApp share */}
+          <button
+            onClick={() => {
+              const text = encodeURIComponent(
+                'Check out my new glasses look! Try SpectaSnap AR — real-time 3D try-on, no app needed: https://spectasnap-orpin.vercel.app/trydemo'
+              );
+              window.open(`https://wa.me/?text=${text}`, '_blank');
+            }}
+            className="flex items-center gap-2 bg-black/60 backdrop-blur-sm border border-white/15
+                       px-4 text-white/80 text-xs font-sans font-medium
+                       hover:border-[#25D366] hover:text-[#25D366] transition-colors"
+            style={{ borderRadius: 2, minHeight: 44 }}
+            title="Share on WhatsApp"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+        </div>
       )}
     </div>
   );
