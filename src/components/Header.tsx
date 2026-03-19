@@ -22,8 +22,14 @@ export default function Header() {
         Virtual Try-On
       </p>
 
-      {/* Spacer to match layout */}
-      <div className="w-7" />
+      {/* Dashboard link */}
+      <Link
+        href="/dashboard"
+        className="text-brand-muted text-xs font-sans font-medium hover:text-brand-gold transition-colors"
+        style={{ textDecoration: 'none' }}
+      >
+        Dashboard
+      </Link>
     </header>
   );
 }
