@@ -113,6 +113,21 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   rightLens.position.set(halfIPD, 0, lensZ);
   group.add(rightLens);
 
+  // Dark tint overlay — rgba(0,0,0,0.22) per design spec
+  const darkTintMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const leftTint = new THREE.Mesh(lensGeo, darkTintMat);
+  leftTint.position.set(-halfIPD, 0, lensZ + 0.0005);
+  group.add(leftTint);
+  const rightTint = new THREE.Mesh(lensGeo, darkTintMat);
+  rightTint.position.set(halfIPD, 0, lensZ + 0.0005);
+  group.add(rightTint);
+
   const bridgeGeo = new THREE.BoxGeometry(preset.bridgeWidth, preset.rimThickness * 0.9, preset.frameDepth * 0.9);
   const bridge = new THREE.Mesh(bridgeGeo, frameMat);
   bridge.position.set(0, preset.lensHeight * 0.14, -preset.frameDepth * 0.15);

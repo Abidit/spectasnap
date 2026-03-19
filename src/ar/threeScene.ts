@@ -442,7 +442,7 @@ export function dispose(): void {
  * BASE_SCALE_FACTOR: multiplied against IPD-derived world scale.
  *   Increase to make glasses larger relative to the face, decrease to shrink.
  */
-const BASE_SCALE_FACTOR = 0.85;
+const BASE_SCALE_FACTOR = 0.72;
 // Global correction for meshes that are authored facing the opposite direction.
 const MODEL_BASE_ROTATION_Y = Math.PI;
 
@@ -505,13 +505,13 @@ export function applyFaceTransform(
 
 // Called every frame alongside applyFaceTransform.
 export function updateTempleExtensions(
-  _landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
+  landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
   _transform: FaceTransform,
-  _canvasW: number,
-  _canvasH: number,
+  canvasW: number,
+  canvasH: number,
 ): void {
-  // Temples hidden — infrastructure preserved for re-enabling later.
-  hideTemples();
+  if (!state) { hideTemples(); return; }
+  updateTemples(landmarks, canvasW, canvasH, state.camera);
 }
 
 export function clearTempleExtensions(): void {
@@ -593,6 +593,10 @@ export function getActiveModel(): THREE.Group | null {
 
 export function getCamera(): THREE.PerspectiveCamera | null {
   return state?.camera ?? null;
+}
+
+export function getCanvas(): HTMLCanvasElement | null {
+  return state?.renderer.domElement ?? null;
 }
 
 export function getScene(): THREE.Scene | null {

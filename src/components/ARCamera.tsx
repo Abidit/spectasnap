@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, CameraOff, Loader2, AlertCircle } from 'lucide-react';
-import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
+import { Loader2, AlertCircle, Download } from 'lucide-react';
+import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
 import { computeTransform, smooth, type FaceTransform } from '@/ar/pose';
@@ -129,17 +129,17 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
         // ── 3-D glasses tracking ─────────────────────────────────────────
         const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
         const prev = smoothedTransformRef.current ?? raw;
-        // position/scale lerp 0.30, rotation lerp 0.22 (snappier response)
-        const smoothed = smooth(prev, raw, 0.30, 0.22);
+        // position/scale lerp 0.15, rotation lerp 0.11 (50% less jitter)
+        const smoothed = smooth(prev, raw, 0.15, 0.11);
         smoothedTransformRef.current = smoothed;
         threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
         threeSceneRef.current?.updateFaceOccluder(result.faceLandmarks[0], canvas.width, canvas.height);
         threeSceneRef.current?.updateTempleExtensions(result.faceLandmarks[0], smoothed, canvas.width, canvas.height);
 
-        // Yaw fade: gracefully hide glasses when head turns past ~24°
+        // Yaw fade: smoothly fade glasses past ~24°, fully gone by ~33° (just under YAW_MAX)
         const absYaw = Math.abs(smoothed.yaw);
         if (absYaw > 0.42) {
-          const fade = 1 - (absYaw - 0.42) / 0.22;
+          const fade = 1 - (absYaw - 0.42) / 0.16;
           threeSceneRef.current?.setModelOpacity(Math.max(0, fade));
         } else {
           threeSceneRef.current?.setModelOpacity(1);
@@ -263,6 +263,49 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
     threeSceneRef.current?.setModelColor(selectedColor.frameHex, selectedColor.lensHex);
   }, [selectedColor, status]);
 
+  const takeSnapshot = useCallback(() => {
+    const videoCanvas = canvasRef.current;
+    if (!videoCanvas) return;
+
+    const out = document.createElement('canvas');
+    out.width = videoCanvas.width;
+    out.height = videoCanvas.height;
+    const ctx = out.getContext('2d');
+    if (!ctx) return;
+
+    // Layer 1: mirrored camera feed
+    ctx.drawImage(videoCanvas, 0, 0);
+
+    // Layer 2: Three.js WebGL overlay
+    const threeCanvas = threeSceneRef.current?.getCanvas?.();
+    if (threeCanvas) {
+      ctx.drawImage(threeCanvas, 0, 0, out.width, out.height);
+    }
+
+    // Watermark
+    const padding = Math.round(out.width * 0.012);
+    const fontSize = Math.round(out.width * 0.018);
+    ctx.font = `600 ${fontSize}px DM Sans, sans-serif`;
+    ctx.fillStyle = 'rgba(201,169,110,0.92)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('SpectaSnap AR', out.width - padding, out.height - padding);
+
+    out.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `spectasnap-${Date.now()}.jpg`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      'image/jpeg',
+      0.92,
+    );
+  }, []);
+
   useEffect(() => {
     return () => {
       stopCamera();
@@ -271,7 +314,7 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
   }, [stopCamera]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-brand-dark overflow-hidden">
+    <div className="relative w-full h-full flex items-center justify-center bg-brand-camera overflow-hidden">
       {/* Hidden video element — actual rendering goes to canvas */}
       <video
         ref={videoRef}
@@ -296,27 +339,59 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
         {status === 'idle' && (
           <motion.div
             key="idle"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-brand-dark"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-8 bg-brand-camera"
           >
-            <div className="w-24 h-24 rounded-full bg-brand-card border border-brand-border flex items-center justify-center shadow-gold">
-              <Camera className="w-10 h-10 text-brand-gold" />
+            {/* Gold corner marks — AR viewport spec */}
+            <div className="absolute inset-5 pointer-events-none" style={{ opacity: 0.4 }}>
+              <div className="absolute top-0 left-0">
+                <div style={{ width: 22, height: 2, backgroundColor: '#C9A96E' }} />
+                <div style={{ width: 2, height: 22, backgroundColor: '#C9A96E' }} />
+              </div>
+              <div className="absolute top-0 right-0 flex flex-col items-end">
+                <div style={{ width: 22, height: 2, backgroundColor: '#C9A96E' }} />
+                <div style={{ width: 2, height: 22, backgroundColor: '#C9A96E' }} />
+              </div>
+              <div className="absolute bottom-0 left-0 flex flex-col justify-end">
+                <div style={{ width: 2, height: 22, backgroundColor: '#C9A96E' }} />
+                <div style={{ width: 22, height: 2, backgroundColor: '#C9A96E' }} />
+              </div>
+              <div className="absolute bottom-0 right-0 flex flex-col items-end justify-end">
+                <div style={{ width: 2, height: 22, backgroundColor: '#C9A96E' }} />
+                <div style={{ width: 22, height: 2, backgroundColor: '#C9A96E' }} />
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-white text-xl font-semibold mb-2">Try On Glasses</p>
-              <p className="text-zinc-400 text-sm max-w-xs">
-                Enable your camera to see how each pair looks on you in real-time AR.
+
+            <p
+              className="font-sans tracking-[0.3em] uppercase text-[10px]"
+              style={{ color: '#C9A96E' }}
+            >
+              SpectaSnap AR
+            </p>
+
+            <div className="text-center px-8">
+              <h2 className="font-serif text-4xl font-semibold text-white leading-tight mb-3">
+                Try On Your<br />Perfect Pair
+              </h2>
+              <p className="text-white/50 text-sm font-sans max-w-[240px] mx-auto leading-relaxed">
+                Real-time 3D fitting powered by face tracking. No download needed.
               </p>
             </div>
+
             <button
               onClick={startCamera}
-              className="px-8 py-3 bg-brand-gold text-black font-semibold rounded-full text-sm
-                         hover:bg-amber-400 active:scale-95 transition-all shadow-gold-sm"
+              className="px-8 py-3.5 font-sans font-semibold text-sm tracking-widest uppercase
+                         transition-colors hover:opacity-90 active:scale-[0.98]"
+              style={{ borderRadius: 2, backgroundColor: '#C9A96E', color: '#1A1612' }}
             >
               Enable Camera
             </button>
+
+            <p className="text-white/25 text-[10px] font-sans tracking-wide">
+              Camera stays private — never stored or shared
+            </p>
           </motion.div>
         )}
 
@@ -327,14 +402,14 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-brand-dark"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-brand-camera"
           >
             <Loader2 className="w-10 h-10 text-brand-gold animate-spin" />
-            <p className="text-zinc-300 text-sm">
+            <p className="text-zinc-300 text-sm font-sans">
               {status === 'requesting' ? 'Accessing camera…' : 'Loading face tracking model…'}
             </p>
             {status === 'loading-mp' && (
-              <p className="text-zinc-500 text-xs">First load may take a few seconds</p>
+              <p className="text-zinc-500 text-xs font-sans">First load may take a few seconds</p>
             )}
           </motion.div>
         )}
@@ -346,16 +421,20 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-brand-dark px-8"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-brand-camera px-8"
           >
-            <div className="w-16 h-16 rounded-full bg-red-950 border border-red-800 flex items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-red-400" />
+            <div
+              className="w-14 h-14 flex items-center justify-center border border-red-800"
+              style={{ backgroundColor: 'rgb(69,10,10)', borderRadius: 2 }}
+            >
+              <AlertCircle className="w-7 h-7 text-red-400" />
             </div>
-            <p className="text-red-300 text-sm text-center max-w-xs">{errorMsg}</p>
+            <p className="text-red-300 text-sm font-sans text-center max-w-xs">{errorMsg}</p>
             <button
               onClick={startCamera}
-              className="px-6 py-2.5 bg-brand-card border border-brand-border text-zinc-200
-                         rounded-full text-sm hover:border-brand-gold transition-colors"
+              className="px-6 py-2.5 font-sans font-medium text-sm text-zinc-200
+                         border border-zinc-700 hover:border-brand-gold transition-colors"
+              style={{ borderRadius: 2 }}
             >
               Try Again
             </button>
@@ -365,9 +444,12 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
 
       {/* Multiple faces warning */}
       {status === 'ready' && multipleFaces && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10
-                        bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
-                        rounded-full px-4 py-1.5 text-amber-300 text-xs font-medium">
+        <div
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-10
+                     bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
+                     px-4 py-1.5 text-amber-300 text-xs font-sans font-medium"
+          style={{ borderRadius: 2 }}
+        >
           Multiple faces — tracking primary
         </div>
       )}
@@ -379,7 +461,7 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
             className="border-2 border-dashed border-brand-gold/40 rounded-[50%]"
             style={{ width: '45%', height: '70%' }}
           />
-          <p className="absolute bottom-[18%] text-brand-gold/60 text-sm font-medium tracking-wide">
+          <p className="absolute bottom-[18%] text-brand-gold/60 text-sm font-sans font-medium tracking-wide">
             Position your face in the frame
           </p>
         </div>
@@ -387,11 +469,30 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
 
       {/* Live badge */}
       {status === 'ready' && faceDetected && (
-        <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm
-                        border border-white/10 rounded-full px-3 py-1.5">
+        <div
+          className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm
+                     border border-white/10 px-3 py-1.5"
+          style={{ borderRadius: 2 }}
+        >
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-white/80 text-xs font-medium">AR Live</span>
+          <span className="text-white/80 text-xs font-sans font-medium">AR Live</span>
         </div>
+      )}
+
+      {/* Snapshot button — visible when tracking active */}
+      {status === 'ready' && faceDetected && (
+        <button
+          onClick={takeSnapshot}
+          className="absolute bottom-[100px] right-4 z-10 flex items-center gap-2
+                     bg-black/60 backdrop-blur-sm border border-white/15
+                     px-4 text-white/80 text-xs font-sans font-medium
+                     hover:border-brand-gold hover:text-brand-gold transition-colors"
+          style={{ borderRadius: 2, minHeight: 44 }}
+          title="Save look"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Save Look</span>
+        </button>
       )}
     </div>
   );
