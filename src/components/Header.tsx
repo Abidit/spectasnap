@@ -31,6 +31,13 @@ export default function Header({ arStatus }: HeaderProps) {
       <div className="flex items-center gap-4">
         {arStatus && <ARStatusBadge status={arStatus} />}
         <Link
+          href="/upload"
+          className="hidden sm:block text-brand-muted text-xs font-sans font-medium hover:text-brand-gold transition-colors"
+          style={{ textDecoration: 'none' }}
+        >
+          Upload
+        </Link>
+        <Link
           href="/dashboard"
           className="text-brand-muted text-xs font-sans font-medium hover:text-brand-gold transition-colors"
           style={{ textDecoration: 'none' }}

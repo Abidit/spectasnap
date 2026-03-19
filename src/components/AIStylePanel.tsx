@@ -57,7 +57,6 @@ function OptionButton({
 
 export default function AIStylePanel({ open, onClose, availableFrames, onRecommendation }: AIStylePanelProps) {
   const [step, setStep] = useState<Step>('q1');
-  const [errorMsg, setErrorMsg] = useState('');
   const [answers, setAnswers] = useState<Answers>({
     occasion: '',
     faceShape: '',
@@ -69,14 +68,25 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
 
   function reset() {
     setStep('q1');
-    setErrorMsg('');
     setAnswers({ occasion: '', faceShape: '', style: '', material: '', avoidColors: '' });
     setResult(null);
   }
 
+  function getFallbackRec(): { frameId: string; frameName: string; rationale: string } {
+    const shape = answers.faceShape || 'Oval';
+    const fallbacks: Record<string, { frameId: string; frameName: string; rationale: string }> = {
+      Oval:    { frameId: 'featured-aviator', frameName: 'Featured Aviator', rationale: 'Aviator frames complement your balanced oval face shape beautifully, adding a touch of classic elegance.' },
+      Round:   { frameId: 'rectangle-01', frameName: 'Rectangle 01', rationale: 'Angular rectangle frames add definition and contrast to softer round face shapes.' },
+      Square:  { frameId: 'featured-round', frameName: 'Featured Round', rationale: 'Round frames soften strong jawlines and add a refined, balanced look to square faces.' },
+      Heart:   { frameId: 'cat-eye-01', frameName: 'Cat-Eye 01', rationale: 'Cat-eye frames balance a wider forehead and draw attention to your eyes beautifully.' },
+      Oblong:  { frameId: 'featured-wayfarer', frameName: 'Featured Wayfarer', rationale: 'Wayfarer frames add width and proportion to longer face shapes for a flattering fit.' },
+      Diamond: { frameId: 'featured-cat-eye', frameName: 'Featured Cat-Eye', rationale: 'Cat-eye frames highlight your cheekbones and complement the unique angles of a diamond face.' },
+    };
+    return fallbacks[shape] ?? fallbacks.Oval;
+  }
+
   async function submit() {
     setStep('loading');
-    setErrorMsg('');
     try {
       const res = await fetch('/api/stylist', {
         method: 'POST',
@@ -87,9 +97,11 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
       if (data.error) throw new Error(data.error);
       setResult(data);
       setStep('result');
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unknown error');
-      setStep('error');
+    } catch {
+      // Fallback to curated recommendation based on face shape — never crash
+      const fallback = getFallbackRec();
+      setResult(fallback);
+      setStep('result');
     }
   }
 
@@ -327,28 +339,6 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
                   </motion.div>
                 )}
 
-                {/* Error */}
-                {step === 'error' && (
-                  <motion.div
-                    key="error"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center gap-4 py-16 text-center"
-                  >
-                    <p className="font-sans text-sm text-brand-muted">Something went wrong.</p>
-                    {errorMsg && (
-                      <p className="font-sans text-xs text-red-500 max-w-[280px] break-words">{errorMsg}</p>
-                    )}
-                    <button
-                      onClick={reset}
-                      className="px-6 py-2.5 font-sans font-medium text-sm border border-brand-border
-                                 text-brand-text hover:border-brand-text transition-colors"
-                      style={{ borderRadius: 2 }}
-                    >
-                      Start Over
-                    </button>
-                  </motion.div>
-                )}
               </AnimatePresence>
             </div>
           </motion.div>

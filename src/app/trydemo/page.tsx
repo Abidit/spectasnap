@@ -7,6 +7,8 @@ import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
 import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import OfflineBanner from '@/components/OfflineBanner';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
 
 const ARCamera = dynamic(() => import('@/components/ARCamera'), { ssr: false });
@@ -51,15 +53,19 @@ export default function TryDemo() {
       className="flex flex-col bg-brand-page"
       style={{ height: '100dvh', maxHeight: '100dvh', overflow: 'hidden' }}
     >
+      <OfflineBanner />
       <Header arStatus={arStatus} />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="relative flex-1 bg-brand-camera overflow-hidden">
+          <ErrorBoundary label="AR camera failed to load. Please reload the page.">
           <ARCamera
             selectedGlasses={selected}
             selectedColor={selectedColor}
             onARStatusChange={setArStatus}
           />
+
+          </ErrorBoundary>
 
           <div
             className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
