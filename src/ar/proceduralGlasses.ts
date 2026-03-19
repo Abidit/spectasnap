@@ -77,7 +77,7 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   const lensMat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(preset.lensTint),
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.42,
     transmission: 0.85,
     roughness: 0.08,
     thickness: 0.005,

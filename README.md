@@ -108,19 +108,19 @@ public/
 ## Getting Started
 
 ```bash
-npm install
-npm run dev        # http://localhost:3000
+yarn install
+yarn dev           # http://localhost:3000
 ```
 
 ### Other commands
 
 ```bash
-npm run build        # production build
-npm run lint         # ESLint check
-npm run lint:fix     # ESLint auto-fix
-npm run format       # Prettier format all files
-npm run format:check # Prettier check (CI)
-npx tsc --noEmit     # type-check only
+yarn build           # production build
+yarn lint            # ESLint check
+yarn lint:fix        # ESLint auto-fix
+yarn format          # Prettier format all files
+yarn format:check    # Prettier check (CI)
+yarn tsc --noEmit    # type-check only
 vercel --prod        # deploy to production (run locally)
 ```
 

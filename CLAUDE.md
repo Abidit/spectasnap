@@ -151,9 +151,11 @@ Form inputs use `border-radius: 2px` (sharp, per spec).
 
 ## Commands
 ```bash
-npm run dev       # local dev server at localhost:3000
-npm run build     # production build
-npx tsc --noEmit  # type-check only
+yarn dev          # local dev server at localhost:3000
+yarn build        # production build
+yarn lint         # ESLint check
+yarn format       # Prettier format all files
+yarn tsc --noEmit # type-check only
 vercel --prod     # deploy to production (run in your terminal)
 ```
 

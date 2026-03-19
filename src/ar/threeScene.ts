@@ -442,7 +442,7 @@ export function dispose(): void {
  * BASE_SCALE_FACTOR: multiplied against IPD-derived world scale.
  *   Increase to make glasses larger relative to the face, decrease to shrink.
  */
-const BASE_SCALE_FACTOR = 1.0;
+const BASE_SCALE_FACTOR = 0.85;
 // Global correction for meshes that are authored facing the opposite direction.
 const MODEL_BASE_ROTATION_Y = Math.PI;
 
