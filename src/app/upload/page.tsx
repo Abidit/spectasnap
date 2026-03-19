@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Glasses, Upload, CheckCircle2 } from 'lucide-react';
+import { Glasses, CheckCircle2, MessageCircle } from 'lucide-react';
 
 const STYLES = ['Round', 'Rectangle', 'Aviator', 'Cat-Eye', 'Wrap', 'Other'];
 
@@ -10,7 +10,6 @@ export default function UploadPage() {
   const [storeName, setStoreName] = useState('');
   const [frameName, setFrameName] = useState('');
   const [style, setStyle] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -20,17 +19,11 @@ export default function UploadPage() {
     setSubmitting(true);
     setError('');
 
-    const formData = new FormData();
-    formData.append('store_name', storeName);
-    formData.append('frame_name', frameName);
-    formData.append('style', style);
-    if (file) formData.append('photo', file);
-
     try {
       const res = await fetch('https://formspree.io/f/xojnpnzy', {
         method: 'POST',
-        body: formData,
-        headers: { Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ store_name: storeName, frame_name: frameName, style }),
       });
       if (!res.ok) throw new Error('Submission failed');
       setDone(true);
@@ -39,6 +32,13 @@ export default function UploadPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function openWhatsApp() {
+    const msg = encodeURIComponent(
+      `Hi SpectaSnap! I just submitted a frame request.\n\nStore: ${storeName}\nFrame: ${frameName}\nStyle: ${style}\n\nI'm sending the frame photo here.`,
+    );
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
   }
 
   return (
@@ -63,20 +63,31 @@ export default function UploadPage() {
 
       <div className="max-w-md mx-auto px-6 py-12">
         {done ? (
-          <div className="text-center py-16">
+          <div className="text-center py-12">
             <CheckCircle2 className="w-12 h-12 mx-auto mb-4" style={{ color: '#C9A96E' }} />
-            <h2 className="font-serif text-2xl font-semibold text-brand-text mb-2">Frame Submitted</h2>
-            <p className="text-brand-muted text-sm font-sans mb-6">
-              We&apos;ll add your frames to SpectaSnap within 24 hours.
+            <h2 className="font-serif text-2xl font-semibold text-brand-text mb-2">Details Submitted</h2>
+            <p className="text-brand-muted text-sm font-sans mb-6 max-w-xs mx-auto">
+              Now send us the frame photo on WhatsApp and we&apos;ll add it within 24 hours.
             </p>
-            <Link
-              href="/trydemo"
-              className="inline-block px-6 py-3 font-sans font-semibold text-sm tracking-wide
-                         bg-brand-text text-brand-page hover:opacity-90 transition-opacity"
-              style={{ borderRadius: 2, textDecoration: 'none' }}
-            >
-              Try Demo
-            </Link>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={openWhatsApp}
+                className="w-full py-3 flex items-center justify-center gap-2 font-sans font-semibold text-sm tracking-wide
+                           text-white hover:opacity-90 transition-opacity"
+                style={{ borderRadius: 2, backgroundColor: '#25D366' }}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Send Photo on WhatsApp
+              </button>
+              <Link
+                href="/trydemo"
+                className="w-full py-3 block text-center font-sans font-semibold text-sm tracking-wide
+                           border border-brand-border text-brand-text hover:border-brand-text transition-colors"
+                style={{ borderRadius: 2, textDecoration: 'none' }}
+              >
+                Back to Try-On
+              </Link>
+            </div>
           </div>
         ) : (
           <>
@@ -86,7 +97,7 @@ export default function UploadPage() {
               </p>
               <h1 className="font-serif text-3xl font-semibold text-brand-text mb-2">Add Your Frames</h1>
               <p className="text-brand-muted text-sm font-sans">
-                Upload a photo of your eyewear frame and we&apos;ll add it to the AR catalogue.
+                Tell us about your frame below, then send the photo via WhatsApp.
               </p>
             </div>
 
@@ -136,24 +147,6 @@ export default function UploadPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-sans font-medium text-brand-text mb-1.5">Frame Photo</label>
-                <label
-                  className="flex items-center justify-center gap-2 w-full px-3 py-6 border border-dashed border-brand-border
-                             text-brand-muted text-sm font-sans cursor-pointer hover:border-brand-gold transition-colors"
-                  style={{ borderRadius: 2 }}
-                >
-                  <Upload className="w-4 h-4" />
-                  {file ? file.name : 'Click to upload photo'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-
               {error && <p className="text-red-500 text-xs font-sans">{error}</p>}
 
               <button
@@ -164,8 +157,12 @@ export default function UploadPage() {
                            disabled:opacity-50"
                 style={{ borderRadius: 2 }}
               >
-                {submitting ? 'Submitting...' : 'Submit Frame'}
+                {submitting ? 'Submitting...' : 'Continue'}
               </button>
+
+              <p className="text-brand-muted text-[10px] font-sans text-center">
+                Step 1 of 2 — you&apos;ll send the frame photo via WhatsApp next
+              </p>
             </form>
           </>
         )}
