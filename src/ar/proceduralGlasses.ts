@@ -56,8 +56,11 @@ function buildRimGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
 
   return new THREE.ExtrudeGeometry(outer, {
     depth: preset.frameDepth,
-    bevelEnabled: false,
-    curveSegments: 24,
+    bevelEnabled: true,
+    bevelSize: 0.001,
+    bevelThickness: 0.001,
+    bevelSegments: 2,
+    curveSegments: 32,
     steps: 1,
   });
 }
@@ -75,11 +78,12 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
     color: new THREE.Color(preset.lensTint),
     transparent: true,
     opacity: 0.26,
-    transmission: 0.6,
+    transmission: 0.85,
     roughness: 0.08,
-    thickness: 0.004,
+    thickness: 0.005,
     metalness: 0.0,
-    ior: 1.45,
+    ior: 1.5,
+    envMapIntensity: 1.2,
   });
 
   const rimGeo = buildRimGeometry(preset);
@@ -114,14 +118,33 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   bridge.position.set(0, preset.lensHeight * 0.14, -preset.frameDepth * 0.15);
   group.add(bridge);
 
-  const templeGeo = new THREE.BoxGeometry(preset.templeLength, preset.rimThickness * 0.8, preset.frameDepth * 0.8);
-  const leftTemple = new THREE.Mesh(templeGeo, frameMat);
-  leftTemple.position.set(-halfIPD - preset.lensWidth * 0.82, 0, -preset.frameDepth * 0.4);
-  group.add(leftTemple);
-
-  const rightTemple = new THREE.Mesh(templeGeo, frameMat);
-  rightTemple.position.set(halfIPD + preset.lensWidth * 0.82, 0, -preset.frameDepth * 0.4);
-  group.add(rightTemple);
-
   return group;
+}
+
+/**
+ * Update the frame and lens colors of a procedural glasses model in-place.
+ * MeshPhysicalMaterial (lenses) is checked before MeshStandardMaterial (rims/temples)
+ * because Physical extends Standard.
+ */
+export function updateGlassesColor(
+  model: THREE.Group,
+  frameHex: string,
+  lensHex: string,
+): void {
+  const frameColor = new THREE.Color(frameHex);
+  const lensColor  = new THREE.Color(lensHex);
+
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (mat instanceof THREE.MeshPhysicalMaterial) {
+        mat.color.copy(lensColor);
+        mat.needsUpdate = true;
+      } else if (mat instanceof THREE.MeshStandardMaterial) {
+        mat.color.copy(frameColor);
+        mat.needsUpdate = true;
+      }
+    }
+  });
 }

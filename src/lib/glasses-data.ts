@@ -1,4 +1,6 @@
-import { PROCEDURAL_PRESETS, type FrameFamily } from '@/ar/presets';
+import { PROCEDURAL_PRESETS, COLOR_VARIANTS, type FrameFamily, type ColorVariant } from '@/ar/presets';
+
+export type { ColorVariant };
 
 export interface GlassesFrame {
   id: string;
@@ -12,6 +14,7 @@ export interface GlassesFrame {
   svg: string;
   scaleFactor: number;
   yOffset: number;
+  colorVariants: ColorVariant[];
 }
 
 function svgToDataUri(svg: string): string {
@@ -87,6 +90,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     svg: buildPreviewSvg('#c9a96e', '#8f9bab', 'aviator'),
     scaleFactor: 1.0,
     yOffset: 0.08,
+    colorVariants: COLOR_VARIANTS,
   },
   {
     id: 'glb-round-metal',
@@ -100,6 +104,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     svg: buildPreviewSvg('#7d8594', '#91a1b3', 'round'),
     scaleFactor: 1.05,
     yOffset: -0.03,
+    colorVariants: COLOR_VARIANTS,
   },
   {
     id: 'glb-wayfarer',
@@ -113,6 +118,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     svg: buildPreviewSvg('#27364a', '#8c98a8', 'rectangle'),
     scaleFactor: 1.06,
     yOffset: -0.04,
+    colorVariants: COLOR_VARIANTS,
   },
   {
     id: 'glb-cat-eye',
@@ -126,6 +132,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     svg: buildPreviewSvg('#613144', '#9b8ca0', 'cat-eye'),
     scaleFactor: 1.0,
     yOffset: -0.05,
+    colorVariants: COLOR_VARIANTS,
   },
   {
     id: 'glb-sport-wrap',
@@ -139,6 +146,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     svg: buildPreviewSvg('#245166', '#87a6b2', 'sport-wrap'),
     scaleFactor: 1.08,
     yOffset: -0.02,
+    colorVariants: COLOR_VARIANTS,
   },
 ];
 
@@ -154,6 +162,7 @@ const PROCEDURAL_FRAMES: GlassesFrame[] = PROCEDURAL_PRESETS.map((preset, idx) =
   svg: buildPreviewSvg(preset.frameColor, preset.lensTint, preset.family),
   scaleFactor: 1 + (idx % 4) * 0.015,
   yOffset: -0.02 + (idx % 3) * 0.01,
+  colorVariants: preset.colorVariants,
 }));
 
 export const GLASSES_COLLECTION: GlassesFrame[] = [

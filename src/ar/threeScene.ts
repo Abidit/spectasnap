@@ -17,11 +17,20 @@ import {
   disposeOccluder,
   hideOccluder,
   setOccluderCamera,
+  setOccluderDebug,
   setOcclusionEnabled as setOccluderEnabled,
   updateOccluder,
 } from './occluder';
-import { createProceduralGlasses } from './proceduralGlasses';
+import { createProceduralGlasses, updateGlassesColor } from './proceduralGlasses';
 import { getProceduralPreset } from './presets';
+import {
+  buildTempleMeshes,
+  disposeTemples,
+  hideTemples,
+  setTempleDebug,
+  updateTemples,
+  updateTempleColor,
+} from './temples';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +42,7 @@ export interface ModelConfig {
   type: 'glb' | 'procedural';
   modelPath?: string;
   presetId?: string;
+  frameColor?: string;
   scaleMultiplier: number;
   offset: { x: number; y: number; z: number };
   rotationOffset: { x: number; y: number; z: number };
@@ -48,7 +58,6 @@ interface OverlayState {
   cache: Map<string, THREE.Group>;
   registry: Map<string, ModelConfig>;
   activeId: string | null;
-  clock: THREE.Clock;
   occlusionEnabled: boolean;
 }
 
@@ -116,12 +125,15 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
   fill.position.set(-0.5, 0.0, 0.5);
   scene.add(fill);
 
+  // Hemisphere light for warm underside fill
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x443322, 0.5);
+  scene.add(hemi);
+
   // ── Model group (holds the active model) ──────────────────────────────────
   const modelGroup = new THREE.Group();
   scene.add(modelGroup);
   buildOccluderMesh(scene, camera);
-
-  const clock = new THREE.Clock();
+  buildTempleMeshes(scene);
 
   state = {
     renderer,
@@ -132,7 +144,6 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
     cache: new Map(),
     registry: new Map(),
     activeId: null,
-    clock,
     occlusionEnabled: DEFAULT_OCCLUSION_ENABLED,
   };
   setOccluderEnabled(DEFAULT_OCCLUSION_ENABLED);
@@ -359,6 +370,15 @@ export function setActiveModel(id: string | null): void {
       setRenderOrderRecursive(model, 1);
       model.visible = true;
     }
+    // Sync temple color with the newly active frame.
+    // models.json rarely has frameColor, so fall back to the preset's frameColor.
+    const cfg = state.registry.get(id);
+    let syncColor: string | undefined = cfg?.frameColor;
+    if (!syncColor && cfg?.type === 'procedural') {
+      const preset = getProceduralPreset(cfg.presetId ?? id);
+      if (preset) syncColor = preset.frameColor;
+    }
+    if (syncColor) updateTempleColor(syncColor);
   }
 }
 
@@ -405,6 +425,7 @@ export function dispose(): void {
 
   state.cache.clear();
   disposeOccluder();
+  disposeTemples();
   state.renderer.dispose();
   state.renderer.domElement.remove();
   state = null;
@@ -482,6 +503,21 @@ export function applyFaceTransform(
   model.rotation.z = -transform.roll + rotOff.z;
 }
 
+// Called every frame alongside applyFaceTransform.
+export function updateTempleExtensions(
+  _landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
+  _transform: FaceTransform,
+  _canvasW: number,
+  _canvasH: number,
+): void {
+  // Temples hidden — infrastructure preserved for re-enabling later.
+  hideTemples();
+}
+
+export function clearTempleExtensions(): void {
+  hideTemples();
+}
+
 // ---------------------------------------------------------------------------
 // setModelOpacity
 // ---------------------------------------------------------------------------
@@ -508,6 +544,17 @@ export function setModelOpacity(opacity: number): void {
   });
 }
 
+/**
+ * Update the frame and lens colors of the active model in-place.
+ * Also syncs the landmark-driven temple arm color.
+ */
+export function setModelColor(frameHex: string, lensHex: string): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (model) updateGlassesColor(model, frameHex, lensHex);
+  updateTempleColor(frameHex);
+}
+
 export function updateFaceOccluder(
   landmarks: NormalizedLandmark[],
   canvasW: number,
@@ -525,6 +572,14 @@ export function setOcclusionEnabled(enabled: boolean): void {
   if (!state) return;
   state.occlusionEnabled = enabled;
   setOccluderEnabled(enabled);
+}
+
+export function setOcclusionDebug(on: boolean): void {
+  setOccluderDebug(on);
+}
+
+export function setTempleExtensionDebug(on: boolean): void {
+  setTempleDebug(on);
 }
 
 // ---------------------------------------------------------------------------

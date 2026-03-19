@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#F7F7F5"/>
+
+  <!-- Left accent bar -->
+  <rect x="80" y="160" width="8" height="260" fill="#2563EB"/>
+
+  <!-- Main heading: SpectaSnap -->
+  <text
+    x="120"
+    y="295"
+    font-family="'Sora', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="110"
+    font-weight="700"
+    fill="#111111"
+    letter-spacing="-3"
+  >SpectaSnap</text>
+
+  <!-- Subheading -->
+  <text
+    x="120"
+    y="370"
+    font-family="'Sora', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="52"
+    font-weight="400"
+    fill="#111111"
+    letter-spacing="-1"
+  >Real-Time 3D Glasses Try-On</text>
+
+  <!-- Blue accent line under subheading -->
+  <rect x="120" y="392" width="400" height="8" fill="#2563EB"/>
+
+  <!-- Bottom strip text -->
+  <text
+    x="120"
+    y="490"
+    font-family="'Sora', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="32"
+    font-weight="400"
+    fill="#5C5C5C"
+    letter-spacing="0"
+  >Built for Optical Stores &amp; Online Shoppers</text>
+
+  <!-- Bottom-right domain -->
+  <text
+    x="1120"
+    y="590"
+    font-family="'Sora', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="24"
+    font-weight="400"
+    fill="#AAAAAA"
+    text-anchor="end"
+  >spectasnap-orpin.vercel.app</text>
+</svg>

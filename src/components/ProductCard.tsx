@@ -2,15 +2,23 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import type { GlassesFrame } from '@/lib/glasses-data';
+import type { GlassesFrame, ColorVariant } from '@/lib/glasses-data';
 
 interface ProductCardProps {
   frame: GlassesFrame;
+  colorVariants?: ColorVariant[];
+  activeColor?: ColorVariant | null;
+  onColorChange?: (variant: ColorVariant) => void;
 }
 
 const ALL_OCCASIONS = ['Casual', 'Office', 'Wedding', 'Sports'] as const;
 
-export default function ProductCard({ frame }: ProductCardProps) {
+export default function ProductCard({
+  frame,
+  colorVariants,
+  activeColor,
+  onColorChange,
+}: ProductCardProps) {
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
 
   return (
@@ -38,6 +46,44 @@ export default function ProductCard({ frame }: ProductCardProps) {
             {frame.style}
           </p>
         </div>
+
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* Color swatches */}
+        {colorVariants && colorVariants.length > 0 && (
+          <div>
+            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+              Frame Color
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {colorVariants.map((variant) => {
+                const isActive = activeColor?.label === variant.label;
+                return (
+                  <button
+                    key={variant.label}
+                    title={variant.label}
+                    onClick={() => onColorChange?.(variant)}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      backgroundColor: variant.frameHex,
+                      border: isActive ? '2px solid #C9A96E' : '2px solid transparent',
+                      outline: isActive ? '2px solid #C9A96E' : '2px solid #DDD8CE',
+                      outlineOffset: 1,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'outline 0.12s',
+                    }}
+                    aria-label={variant.label}
+                    aria-pressed={isActive}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="border-t border-brand-border" />

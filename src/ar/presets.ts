@@ -1,5 +1,20 @@
 export type FrameFamily = 'round' | 'rectangle' | 'aviator' | 'cat-eye' | 'sport-wrap';
 
+export interface ColorVariant {
+  label: string;
+  frameHex: string;
+  lensHex: string;
+}
+
+export const COLOR_VARIANTS: ColorVariant[] = [
+  { label: 'Matte Black', frameHex: '#1b1b1d', lensHex: '#8f9bab' },
+  { label: 'Tortoise',    frameHex: '#6a4d3c', lensHex: '#9aa38f' },
+  { label: 'Gold',        frameHex: '#c9a96e', lensHex: '#b5a88a' },
+  { label: 'Navy',        frameHex: '#1e3f63', lensHex: '#88a3ad' },
+  { label: 'Burgundy',    frameHex: '#7a2f2f', lensHex: '#9498ad' },
+  { label: 'Clear',       frameHex: '#c8c8c8', lensHex: '#e0e8f0' },
+];
+
 export interface ProceduralPreset {
   id: string;
   name: string;
@@ -19,6 +34,7 @@ export interface ProceduralPreset {
   templeLength: number;
   lensGap: number;
   browLift: number;
+  colorVariants: ColorVariant[];
 }
 
 const SHAPES = [
@@ -148,6 +164,7 @@ function makePreset(
     templeLength,
     lensGap,
     browLift,
+    colorVariants: COLOR_VARIANTS,
   };
 }
 

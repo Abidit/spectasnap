@@ -7,11 +7,13 @@ import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
 import { computeTransform, smooth, type FaceTransform } from '@/ar/pose';
+import type { ColorVariant } from '@/lib/glasses-data';
 
 type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'error';
 
 interface ARCameraProps {
   selectedGlasses: GlassesFrame;
+  selectedColor?: ColorVariant | null;
 }
 
 const MEDIAPIPE_WASM =
@@ -22,7 +24,7 @@ const MEDIAPIPE_MODEL =
 const FACE_HOLD_MS = 500; // hold last position this long after face disappears
 const FACE_FADE_MS = 300; // then fade to transparent over this duration
 
-export default function ARCamera({ selectedGlasses }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -37,6 +39,7 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
+  const [multipleFaces, setMultipleFaces] = useState(false);
 
   // Preload glasses image whenever selection changes
   useEffect(() => {
@@ -94,6 +97,7 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
       if (result.faceLandmarks && result.faceLandmarks.length > 0) {
         faceLastSeenRef.current = now;
         setFaceDetected(true);
+        setMultipleFaces(result.faceLandmarks.length > 1);
 
         const img = glassesImgRef.current;
         if (img) {
@@ -110,15 +114,26 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
         // ── 3-D glasses tracking ─────────────────────────────────────────
         const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
         const prev = smoothedTransformRef.current ?? raw;
-        // position/scale lerp 0.18, rotation lerp 0.12
-        const smoothed = smooth(prev, raw, 0.18, 0.12);
+        // position/scale lerp 0.30, rotation lerp 0.22 (snappier response)
+        const smoothed = smooth(prev, raw, 0.30, 0.22);
         smoothedTransformRef.current = smoothed;
         threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
         threeSceneRef.current?.updateFaceOccluder(result.faceLandmarks[0], canvas.width, canvas.height);
-        threeSceneRef.current?.setModelOpacity(1);
+        threeSceneRef.current?.updateTempleExtensions(result.faceLandmarks[0], smoothed, canvas.width, canvas.height);
+
+        // Yaw fade: gracefully hide glasses when head turns past ~24°
+        const absYaw = Math.abs(smoothed.yaw);
+        if (absYaw > 0.42) {
+          const fade = 1 - (absYaw - 0.42) / 0.22;
+          threeSceneRef.current?.setModelOpacity(Math.max(0, fade));
+        } else {
+          threeSceneRef.current?.setModelOpacity(1);
+        }
       } else {
         setFaceDetected(false);
+        setMultipleFaces(false);
         threeSceneRef.current?.clearFaceOccluder();
+        threeSceneRef.current?.clearTempleExtensions();
 
         // ── Stability: hold 500 ms, then fade over 300 ms ─────────────────
         const elapsed = now - faceLastSeenRef.current;
@@ -174,7 +189,7 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
-        numFaces: 1,
+        numFaces: 3,
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
@@ -189,7 +204,7 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
             delegate: 'CPU',
           },
           runningMode: 'VIDEO',
-          numFaces: 1,
+          numFaces: 3,
           outputFaceBlendshapes: false,
           outputFacialTransformationMatrixes: false,
         });
@@ -203,6 +218,13 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
     // Pre-load the Three.js scene module so applyFaceTransform is available
     // from the first rendered frame (non-blocking; overlay init runs in parallel).
     threeSceneRef.current = await import('@/ar/threeScene');
+
+    // URL debug flags: ?debugOcclusion=1  ?debugTemples=1
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('debugOcclusion') === '1') threeSceneRef.current.setOcclusionDebug(true);
+      if (params.get('debugTemples')   === '1') threeSceneRef.current.setTempleExtensionDebug(true);
+    }
 
     setStatus('ready');
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -220,6 +242,11 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
     if (status !== 'ready') return;
     void threeSceneRef.current?.selectModel(selectedGlasses.id);
   }, [selectedGlasses.id, status]);
+
+  useEffect(() => {
+    if (!selectedColor || status !== 'ready') return;
+    threeSceneRef.current?.setModelColor(selectedColor.frameHex, selectedColor.lensHex);
+  }, [selectedColor, status]);
 
   useEffect(() => {
     return () => {
@@ -320,6 +347,15 @@ export default function ARCamera({ selectedGlasses }: ARCameraProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Multiple faces warning */}
+      {status === 'ready' && multipleFaces && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10
+                        bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
+                        rounded-full px-4 py-1.5 text-amber-300 text-xs font-medium">
+          Multiple faces — tracking primary
+        </div>
+      )}
 
       {/* Face guide overlay — shown only when camera is ready */}
       {status === 'ready' && !faceDetected && (

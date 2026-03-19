@@ -1,49 +1,9 @@
 [
-  {
-    "id": "glb-aviator",
-    "name": "Featured Aviator",
-    "type": "glb",
-    "modelPath": "/models/aviator.glb",
-    "scaleMultiplier": 1.0,
-    "offset": { "x": 0, "y": 0, "z": 0 },
-    "rotationOffset": { "x": 0, "y": 0, "z": 0 }
-  },
-  {
-    "id": "glb-round-metal",
-    "name": "Featured Round",
-    "type": "glb",
-    "modelPath": "/models/round-metal.glb",
-    "scaleMultiplier": 1.0,
-    "offset": { "x": 0, "y": 0, "z": 0 },
-    "rotationOffset": { "x": 0, "y": 0, "z": 0 }
-  },
-  {
-    "id": "glb-wayfarer",
-    "name": "Featured Wayfarer",
-    "type": "glb",
-    "modelPath": "/models/wayfarer.glb",
-    "scaleMultiplier": 1.0,
-    "offset": { "x": 0, "y": 0, "z": 0 },
-    "rotationOffset": { "x": 0, "y": 0, "z": 0 }
-  },
-  {
-    "id": "glb-cat-eye",
-    "name": "Featured Cat-Eye",
-    "type": "glb",
-    "modelPath": "/models/cat-eye.glb",
-    "scaleMultiplier": 1.0,
-    "offset": { "x": 0, "y": 0, "z": 0 },
-    "rotationOffset": { "x": 0, "y": 0, "z": 0 }
-  },
-  {
-    "id": "glb-sport-wrap",
-    "name": "Featured Wrap",
-    "type": "glb",
-    "modelPath": "/models/sport-wrap.glb",
-    "scaleMultiplier": 1.0,
-    "offset": { "x": 0, "y": 0, "z": 0 },
-    "rotationOffset": { "x": 0, "y": 0, "z": 0 }
-  },
+  { "id": "glb-aviator",    "name": "Featured Aviator",  "type": "procedural", "presetId": "aviator-01",   "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
+  { "id": "glb-round-metal","name": "Featured Round",    "type": "procedural", "presetId": "round-01",     "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
+  { "id": "glb-wayfarer",   "name": "Featured Wayfarer", "type": "procedural", "presetId": "rectangle-01", "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
+  { "id": "glb-cat-eye",    "name": "Featured Cat-Eye",  "type": "procedural", "presetId": "cat-eye-01",   "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
+  { "id": "glb-sport-wrap", "name": "Featured Wrap",     "type": "procedural", "presetId": "sport-wrap-01","scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
   { "id": "round-01", "name": "Round 01", "type": "procedural", "presetId": "round-01", "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
   { "id": "round-02", "name": "Round 02", "type": "procedural", "presetId": "round-02", "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
   { "id": "round-03", "name": "Round 03", "type": "procedural", "presetId": "round-03", "scaleMultiplier": 1.0, "offset": { "x": 0, "y": 0, "z": 0 }, "rotationOffset": { "x": 0, "y": 0, "z": 0 } },
