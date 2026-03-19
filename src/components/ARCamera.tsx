@@ -8,16 +8,18 @@ import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
 import { computeTransform, smooth, type FaceTransform } from '@/ar/pose';
 import type { ColorVariant } from '@/lib/glasses-data';
+import type { ARStatusKind } from '@/components/ARStatusBadge';
 
 type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'error';
 
 interface ARCameraProps {
   selectedGlasses: GlassesFrame;
   selectedColor?: ColorVariant | null;
+  /** Called whenever the AR tracking state changes so parents can surface it. */
+  onARStatusChange?: (status: ARStatusKind) => void;
 }
 
-const MEDIAPIPE_WASM =
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
 const MEDIAPIPE_MODEL =
   'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
@@ -30,12 +32,17 @@ if (typeof window !== 'undefined') {
   const _origError = console.error.bind(console);
   console.error = (...args: unknown[]) => {
     const msg = String(args[0] ?? '');
-    if (msg.includes('TensorFlow Lite') || msg.includes('XNNPACK') || msg.includes('Created TensorFlow')) return;
+    if (
+      msg.includes('TensorFlow Lite') ||
+      msg.includes('XNNPACK') ||
+      msg.includes('Created TensorFlow')
+    )
+      return;
     _origError(...args);
   };
 }
 
-export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor, onARStatusChange }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -56,7 +63,9 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
   useEffect(() => {
     glassesImgRef.current = null;
     preloadGlassesImage(selectedGlasses.svg)
-      .then((img) => { glassesImgRef.current = img; })
+      .then((img) => {
+        glassesImgRef.current = img;
+      })
       .catch(() => {});
   }, [selectedGlasses]);
 
@@ -122,19 +131,28 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
             img,
             selectedGlasses,
             canvas.width,
-            canvas.height,
+            canvas.height
           );
         }
 
         // ── 3-D glasses tracking ─────────────────────────────────────────
         const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
         const prev = smoothedTransformRef.current ?? raw;
-        // position/scale lerp 0.15, rotation lerp 0.11 (50% less jitter)
-        const smoothed = smooth(prev, raw, 0.15, 0.11);
+        // position/scale lerp 0.30, rotation lerp 0.22 (snappier response)
+        const smoothed = smooth(prev, raw, 0.3, 0.22);
         smoothedTransformRef.current = smoothed;
         threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
-        threeSceneRef.current?.updateFaceOccluder(result.faceLandmarks[0], canvas.width, canvas.height);
-        threeSceneRef.current?.updateTempleExtensions(result.faceLandmarks[0], smoothed, canvas.width, canvas.height);
+        threeSceneRef.current?.updateFaceOccluder(
+          result.faceLandmarks[0],
+          canvas.width,
+          canvas.height
+        );
+        threeSceneRef.current?.updateTempleExtensions(
+          result.faceLandmarks[0],
+          smoothed,
+          canvas.width,
+          canvas.height
+        );
 
         // Yaw fade: smoothly fade glasses past ~24°, fully gone by ~33° (just under YAW_MAX)
         const absYaw = Math.abs(smoothed.yaw);
@@ -156,11 +174,9 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
           threeSceneRef.current?.applyFaceTransform(
             smoothedTransformRef.current,
             canvas.width,
-            canvas.height,
+            canvas.height
           );
-          const opacity = elapsed < FACE_HOLD_MS
-            ? 1
-            : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
+          const opacity = elapsed < FACE_HOLD_MS ? 1 : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
           threeSceneRef.current?.setModelOpacity(opacity);
         } else {
           threeSceneRef.current?.setModelOpacity(0);
@@ -238,7 +254,7 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('debugOcclusion') === '1') threeSceneRef.current.setOcclusionDebug(true);
-      if (params.get('debugTemples')   === '1') threeSceneRef.current.setTempleExtensionDebug(true);
+      if (params.get('debugTemples') === '1') threeSceneRef.current.setTempleExtensionDebug(true);
     }
 
     setStatus('ready');
@@ -313,16 +329,20 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
     };
   }, [stopCamera]);
 
+  // Report AR status to parent whenever it changes
+  useEffect(() => {
+    if (!onARStatusChange) return;
+    if (status === 'idle')                              onARStatusChange('idle');
+    else if (status === 'requesting' || status === 'loading-mp') onARStatusChange('loading');
+    else if (status === 'error')                        onARStatusChange('error');
+    else if (status === 'ready' && faceDetected)        onARStatusChange('tracking');
+    else if (status === 'ready' && !faceDetected)       onARStatusChange('searching');
+  }, [status, faceDetected, onARStatusChange]);
+
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-brand-camera overflow-hidden">
       {/* Hidden video element — actual rendering goes to canvas */}
-      <video
-        ref={videoRef}
-        className="hidden"
-        playsInline
-        muted
-        autoPlay
-      />
+      <video ref={videoRef} className="hidden" playsInline muted autoPlay />
 
       {/* Canvas — shows mirrored camera + glasses overlay */}
       <canvas
@@ -446,9 +466,8 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
       {status === 'ready' && multipleFaces && (
         <div
           className="absolute top-4 left-1/2 -translate-x-1/2 z-10
-                     bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
-                     px-4 py-1.5 text-amber-300 text-xs font-sans font-medium"
-          style={{ borderRadius: 2 }}
+                        bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
+                        rounded-full px-4 py-1.5 text-amber-300 text-xs font-medium"
         >
           Multiple faces — tracking primary
         </div>
@@ -471,8 +490,7 @@ export default function ARCamera({ selectedGlasses, selectedColor }: ARCameraPro
       {status === 'ready' && faceDetected && (
         <div
           className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm
-                     border border-white/10 px-3 py-1.5"
-          style={{ borderRadius: 2 }}
+                        border border-white/10 rounded-full px-3 py-1.5"
         >
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           <span className="text-white/80 text-xs font-sans font-medium">AR Live</span>

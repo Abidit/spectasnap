@@ -1,9 +1,26 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
 import clsx from 'clsx';
+
+type FilterFamily = 'all' | 'round' | 'rectangle' | 'aviator' | 'cat-eye' | 'sport-wrap';
+
+const FILTERS: { key: FilterFamily; label: string }[] = [
+  { key: 'all',        label: 'All'       },
+  { key: 'round',      label: 'Round'     },
+  { key: 'rectangle',  label: 'Rectangle' },
+  { key: 'aviator',    label: 'Aviator'   },
+  { key: 'cat-eye',    label: 'Cat-Eye'   },
+  { key: 'sport-wrap', label: 'Sport'     },
+];
+
+/** Normalize a frame's style string to a FilterFamily key. */
+function frameFamily(frame: GlassesFrame): FilterFamily {
+  return frame.style.toLowerCase().replace(/\s+/g, '-') as FilterFamily;
+}
 
 interface GlassesGridProps {
   selected: GlassesFrame;
@@ -11,18 +28,96 @@ interface GlassesGridProps {
 }
 
 export default function GlassesGrid({ selected, onSelect }: GlassesGridProps) {
+  const [activeFilter, setActiveFilter] = useState<FilterFamily>('all');
+
+  // Pre-compute counts once
+  const counts = useMemo(() => {
+    const c: Record<FilterFamily, number> = {
+      all: GLASSES_COLLECTION.length,
+      round: 0, rectangle: 0, aviator: 0, 'cat-eye': 0, 'sport-wrap': 0,
+    };
+    GLASSES_COLLECTION.forEach((f) => {
+      const fam = frameFamily(f);
+      if (fam in c) c[fam]++;
+    });
+    return c;
+  }, []);
+
+  const filtered = useMemo(
+    () =>
+      activeFilter === 'all'
+        ? GLASSES_COLLECTION
+        : GLASSES_COLLECTION.filter((f) => frameFamily(f) === activeFilter),
+    [activeFilter],
+  );
+
   return (
     <div className="flex flex-col gap-2">
+      {/* ── Header row ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-1">
         <h2 className="text-white/80 font-sans font-medium text-xs tracking-[0.12em] uppercase">
           Choose Frames
         </h2>
-        <span className="text-white/40 text-xs font-sans">{GLASSES_COLLECTION.length} styles</span>
+        <span className="text-white/40 text-xs font-sans">
+          {filtered.length} style{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
-      {/* Horizontal scroll row */}
+      {/* ── Filter bar ──────────────────────────────────────────────────── */}
+      <div
+        role="tablist"
+        aria-label="Filter frames by shape"
+        className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide"
+      >
+        {FILTERS.map(({ key, label }) => {
+          const isActive = activeFilter === key;
+          const count = counts[key];
+          const disabled = count === 0;
+          return (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={isActive}
+              disabled={disabled}
+              onClick={() => setActiveFilter(key)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 font-sans font-semibold
+                         tracking-[0.1em] uppercase transition-all duration-150 focus-visible:outline-none
+                         focus-visible:ring-1 focus-visible:ring-brand-gold"
+              style={{
+                fontSize: 10,
+                borderRadius: 2,
+                border: isActive
+                  ? '1px solid rgba(201,169,110,0.7)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                background: isActive
+                  ? 'rgba(201,169,110,0.14)'
+                  : 'rgba(255,255,255,0.05)',
+                color: isActive
+                  ? '#C9A96E'
+                  : disabled
+                    ? 'rgba(255,255,255,0.2)'
+                    : 'rgba(255,255,255,0.5)',
+                cursor: disabled ? 'default' : 'pointer',
+              }}
+            >
+              {label}
+              <span
+                style={{
+                  fontSize: 9,
+                  color: isActive ? '#A8844A' : 'rgba(255,255,255,0.22)',
+                  fontWeight: 500,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Horizontal scroll row ───────────────────────────────────────── */}
       <div className="flex gap-2.5 overflow-x-auto pb-0.5 scrollbar-hide snap-x snap-mandatory">
-        {GLASSES_COLLECTION.map((frame) => {
+        {filtered.map((frame) => {
           const isSelected = frame.id === selected.id;
           return (
             <motion.button
@@ -49,7 +144,7 @@ export default function GlassesGrid({ selected, onSelect }: GlassesGridProps) {
                 />
               </div>
 
-              {/* Name — no price */}
+              {/* Name */}
               <div className="text-center">
                 <p
                   className="text-[11px] font-sans font-medium leading-tight"
