@@ -505,13 +505,12 @@ export function applyFaceTransform(
 
 // Called every frame alongside applyFaceTransform.
 export function updateTempleExtensions(
-  landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
+  _landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
   _transform: FaceTransform,
-  canvasW: number,
-  canvasH: number,
+  _canvasW: number,
+  _canvasH: number,
 ): void {
-  if (!state) { hideTemples(); return; }
-  updateTemples(landmarks, canvasW, canvasH, state.camera);
+  hideTemples();
 }
 
 export function clearTempleExtensions(): void {
