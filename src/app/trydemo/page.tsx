@@ -86,8 +86,8 @@ export default function TryDemo() {
               onAskStaff={handleAskStaff}
             />
           </div>
-          {/* AI Stylist CTA */}
-          <div className="px-6 pb-4 border-t border-brand-border pt-4">
+          {/* AI Stylist CTA — hidden until ANTHROPIC_API_KEY is configured */}
+          {/* <div className="px-6 pb-4 border-t border-brand-border pt-4">
             <button
               onClick={() => setStylePanelOpen(true)}
               className="w-full py-2.5 font-sans font-semibold text-xs tracking-wide
@@ -97,7 +97,7 @@ export default function TryDemo() {
             >
               ✦ AI Style Advisor
             </button>
-          </div>
+          </div> */}
           <div className="px-6 py-4 border-t border-brand-border">
             <p className="text-brand-muted text-[10px] text-center font-sans tracking-wide">
               Powered by MediaPipe · SpectaSnap AR © 2026
@@ -121,7 +121,8 @@ export default function TryDemo() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button
+            {/* AI button hidden until ANTHROPIC_API_KEY is configured */}
+            {/* <button
               onClick={() => setStylePanelOpen(true)}
               className="px-3 font-sans font-semibold text-xs tracking-wide
                          border border-brand-gold text-brand-gold hover:bg-[rgba(201,169,110,0.08)]
@@ -129,7 +130,7 @@ export default function TryDemo() {
               style={{ borderRadius: 2, minHeight: 44 }}
             >
               ✦ AI
-            </button>
+            </button> */}
             <button
               onClick={handleAskStaff}
               className="px-4 py-2 font-sans font-semibold text-xs tracking-wide
