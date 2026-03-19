@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, AlertCircle, Download, Share2 } from 'lucide-react';
+import { AlertCircle, Download, Share2 } from 'lucide-react';
 import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
-import { computeTransform, smooth, type FaceTransform } from '@/ar/pose';
+import { computeTransform, smooth, computeFaceShape, type FaceTransform } from '@/ar/pose';
 import type { ColorVariant } from '@/lib/glasses-data';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
 
@@ -17,6 +17,14 @@ interface ARCameraProps {
   selectedColor?: ColorVariant | null;
   /** Called whenever the AR tracking state changes so parents can surface it. */
   onARStatusChange?: (status: ARStatusKind) => void;
+  /** Called once with the detected face shape when a face is first tracked. */
+  onFaceShapeDetected?: (shape: string) => void;
+  /**
+   * Pass a MutableRefObject — ARCamera will set its `.current` to a function
+   * that returns a composite JPEG dataUrl (camera + 3D glasses + watermark).
+   * Used by ShareModal to capture the current look.
+   */
+  captureRef?: RefObject<(() => string | null) | null>;
 }
 
 const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
@@ -42,7 +50,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export default function ARCamera({ selectedGlasses, selectedColor, onARStatusChange }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor, onARStatusChange, onFaceShapeDetected, captureRef }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,11 +61,19 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
   const smoothedTransformRef = useRef<FaceTransform | null>(null);
   const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
   const faceLastSeenRef = useRef<number>(-Infinity);
+  const faceShapeDetectedRef = useRef(false);
+  const sessionRef = useRef<{
+    store: string;
+    faceShape: string | null;
+    framesTried: string[];
+    startTime: number;
+  } | null>(null);
 
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [multipleFaces, setMultipleFaces] = useState(false);
+  const [detectedFaceShape, setDetectedFaceShape] = useState<string | null>(null);
 
   // Preload glasses image whenever selection changes
   useEffect(() => {
@@ -122,6 +138,33 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
         faceLastSeenRef.current = now;
         setFaceDetected(true);
         setMultipleFaces(result.faceLandmarks.length > 1);
+
+        // Detect face shape + create session on first tracked frame
+        if (!faceShapeDetectedRef.current) {
+          faceShapeDetectedRef.current = true;
+          const shape = computeFaceShape(result.faceLandmarks[0]);
+          setDetectedFaceShape(shape);
+
+          // Create session record
+          const store =
+            typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('store') || 'default'
+              : 'default';
+          sessionRef.current = {
+            store,
+            faceShape: shape,
+            framesTried: [],
+            startTime: Date.now(),
+          };
+        }
+
+        // Track frame switches in session
+        if (sessionRef.current) {
+          const id = selectedGlasses.id;
+          if (!sessionRef.current.framesTried.includes(id)) {
+            sessionRef.current.framesTried.push(id);
+          }
+        }
 
         const img = glassesImgRef.current;
         if (img) {
@@ -203,7 +246,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (err) {
+    } catch {
       setStatus('error');
       setErrorMsg('Camera access denied. Please allow camera permissions and reload.');
       return;
@@ -239,7 +282,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
           outputFaceBlendshapes: false,
           outputFacialTransformationMatrixes: false,
         });
-      } catch (err2) {
+      } catch {
         setStatus('error');
         setErrorMsg('Failed to load face tracking model. Check your connection and try again.');
         return;
@@ -324,10 +367,62 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
 
   useEffect(() => {
     return () => {
+      // POST final session on unmount
+      if (sessionRef.current) {
+        const duration = Math.round((Date.now() - sessionRef.current.startTime) / 1000);
+        const payload = { ...sessionRef.current, duration };
+        fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+        sessionRef.current = null;
+      }
       stopCamera();
       landmarkerRef.current?.close();
     };
   }, [stopCamera]);
+
+  // Expose composite snapshot function to parent via captureRef
+  useEffect(() => {
+    if (!captureRef) return;
+    (captureRef as React.MutableRefObject<(() => string | null) | null>).current = () => {
+      const videoCanvas = canvasRef.current;
+      if (!videoCanvas) return null;
+
+      const out = document.createElement('canvas');
+      out.width = videoCanvas.width;
+      out.height = videoCanvas.height;
+      const ctx = out.getContext('2d');
+      if (!ctx) return null;
+
+      // Layer 1: mirrored camera + 2D glasses
+      ctx.drawImage(videoCanvas, 0, 0);
+
+      // Layer 2: Three.js WebGL glasses
+      const threeCanvas = threeSceneRef.current?.getCanvas?.();
+      if (threeCanvas) {
+        ctx.drawImage(threeCanvas, 0, 0, out.width, out.height);
+      }
+
+      // Watermark per spec: italic serif, bottom-right, cream
+      const w = out.width;
+      const h = out.height;
+      const size = Math.round(w * 0.038);
+      ctx.font = `italic 600 ${size}px 'Cormorant Garamond', Georgia, serif`;
+      ctx.fillStyle = 'rgba(245,240,232,0.9)';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('SpectaSnap', w - 14, h - 14);
+
+      return out.toDataURL('image/jpeg', 0.92);
+    };
+    return () => {
+      if (captureRef) {
+        (captureRef as React.MutableRefObject<(() => string | null) | null>).current = null;
+      }
+    };
+  }, [captureRef]);
 
   // Report AR status to parent whenever it changes
   useEffect(() => {
@@ -338,6 +433,13 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
     else if (status === 'ready' && faceDetected)        onARStatusChange('tracking');
     else if (status === 'ready' && !faceDetected)       onARStatusChange('searching');
   }, [status, faceDetected, onARStatusChange]);
+
+  // Report detected face shape to parent (fires once per mount when first detected)
+  useEffect(() => {
+    if (detectedFaceShape && onFaceShapeDetected) {
+      onFaceShapeDetected(detectedFaceShape);
+    }
+  }, [detectedFaceShape, onFaceShapeDetected]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-brand-camera overflow-hidden">
@@ -422,15 +524,39 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-brand-camera"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+            style={{ backgroundColor: 'rgba(245,240,232,0.95)' }}
           >
-            <Loader2 className="w-10 h-10 text-brand-gold animate-spin" />
-            <p className="text-zinc-300 text-sm font-sans">
-              {status === 'requesting' ? 'Accessing camera…' : 'Loading face tracking model…'}
+            <p
+              className="font-semibold text-brand-text leading-none"
+              style={{
+                fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)',
+                fontStyle: 'italic',
+                fontSize: '1.4rem',
+              }}
+            >
+              SpectaSnap
             </p>
-            {status === 'loading-mp' && (
-              <p className="text-zinc-500 text-xs font-sans">First load may take a few seconds</p>
-            )}
+            <p
+              className="font-sans uppercase tracking-[2px] text-brand-muted"
+              style={{ fontSize: '0.75rem' }}
+            >
+              {status === 'requesting' ? 'Starting camera…' : 'Loading AR engine…'}
+            </p>
+            {/* Pulsing gold dot */}
+            <div
+              className="w-2 h-2 rounded-full mt-1"
+              style={{
+                backgroundColor: '#C9A96E',
+                animation: 'spectasnap-pulse 1.5s ease-in-out infinite',
+              }}
+            />
+            <style>{`
+              @keyframes spectasnap-pulse {
+                0%, 100% { opacity: 0.3; }
+                50%       { opacity: 1; }
+              }
+            `}</style>
           </motion.div>
         )}
 

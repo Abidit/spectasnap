@@ -143,3 +143,34 @@ export function smooth(
     pitch: prev.pitch + (next.pitch - prev.pitch) * rotAlpha,
   };
 }
+
+// ── computeFaceShape ──────────────────────────────────────────────────────────
+
+/**
+ * Infers face shape from landmark geometry using normalised landmark coordinates.
+ *
+ * Uses:
+ *  - Face width  : cheek-to-cheek (landmarks 234 → 454)
+ *  - Face height : forehead top → chin (landmarks 10 → 152)
+ *  - Jaw width   : jaw corners (landmarks 58 → 288)
+ *  - Forehead    : forehead side points (landmarks 54 → 284)
+ */
+export function computeFaceShape(
+  landmarks: NormalizedLandmark[],
+): 'oval' | 'round' | 'square' | 'heart' | 'oblong' {
+  function dist(a: NormalizedLandmark, b: NormalizedLandmark): number {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  const faceW = dist(landmarks[234], landmarks[454]); // cheek-to-cheek
+  const faceH = dist(landmarks[10],  landmarks[152]); // forehead to chin
+  const jawW  = dist(landmarks[58],  landmarks[288]); // jaw width
+  const foreW = dist(landmarks[54],  landmarks[284]); // forehead width
+  const ratio = faceW / (faceH || 0.001);             // width-to-height ratio
+
+  if (foreW > jawW * 1.1)                    return 'heart';   // wider forehead than jaw
+  if (ratio < 0.63)                          return 'oblong';  // tall & narrow
+  if (ratio > 0.88)                          return 'round';   // wide & full
+  if (jawW > faceW * 0.92 && ratio > 0.78)  return 'square';  // strong jaw + wide
+  return 'oval';
+}

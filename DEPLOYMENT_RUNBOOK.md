@@ -8,6 +8,8 @@
 | `/trydemo` | Live AR try-on experience |
 | `/dashboard` | Store owner analytics (PIN: 1234) |
 | `/upload` | Frame upload portal |
+| `/qr` | Generate store QR codes |
+| `/onepager` | Print-ready A4 sales sheet |
 
 **Production URL:** https://spectasnap-orpin.vercel.app
 **Vercel Project:** abidit-7188s-projects/spectasnap
@@ -18,9 +20,21 @@
 
 | Variable | Required | Where |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Optional | `.env.local` — enables AI Style Advisor |
+| `ANTHROPIC_API_KEY` | Optional | Vercel Dashboard — enables AI Style Advisor |
+| `KV_REST_API_URL` | Sprint 5 | Auto-added by `npx vercel kv create` |
+| `KV_REST_API_TOKEN` | Sprint 5 | Auto-added by `npx vercel kv create` |
 
-No other env vars required. All data is client-side (localStorage).
+---
+
+## Set Up Vercel KV (Sprint 5 — run once)
+
+```bash
+npx vercel kv create spectasnap-sessions
+# Vercel automatically adds KV_REST_API_URL and KV_REST_API_TOKEN
+vercel --prod
+```
+
+Session data is stored per-store as: `sessions:{storeName}` (last 500 kept).
 
 ---
 
