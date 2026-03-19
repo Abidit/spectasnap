@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
@@ -115,7 +115,8 @@ export default function Dashboard() {
   const [view, setView] = useState<View>('pin');
   const [pin, setPin] = useState('');
   const [shake, setShake] = useState(false);
-  const [sessions, setSessions] = useState<Session[]>(() => {
+  // Seed data used as fallback while real KV data loads
+  const [sessions] = useState<Session[]>(() => {
     if (typeof window === 'undefined') return SEED_SESSIONS;
     const raw = localStorage.getItem('spectasnap_dashboard');
     if (raw) return JSON.parse(raw) as Session[];
@@ -128,6 +129,56 @@ export default function Dashboard() {
     return raw ? (JSON.parse(raw) as Settings) : DEFAULT_SETTINGS;
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Live data from Vercel KV API
+  const [liveStats, setLiveStats] = useState<{
+    todaySessions: number;
+    weekSessions: number;
+    topFrame: string;
+    topShape: string;
+    shapeBreakdown: Record<string, number>;
+    recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
+    totalSessions: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    const store =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('store') || 'default'
+        : 'default';
+    setStatsLoading(true);
+    try {
+      const res = await fetch(`/api/stats?store=${store}`);
+      const data = (await res.json()) as {
+        todaySessions: number;
+        weekSessions: number;
+        topFrame: string;
+        topShape: string;
+        shapeBreakdown: Record<string, number>;
+        recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
+        totalSessions: number;
+        error?: string;
+      };
+      if (!res.ok || data?.error) throw new Error(data?.error ?? 'Failed');
+      setLiveStats(data);
+      setStatsError(false);
+    } catch {
+      setStatsError(true);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  // Fetch real data when dashboard unlocks; auto-refresh every 30s
+  useEffect(() => {
+    if (view !== 'dashboard') return;
+    void fetchStats();
+    const interval = setInterval(() => void fetchStats(), 30000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   function handleDigit(d: string) {
     if (pin.length >= 4) return;
@@ -149,13 +200,14 @@ export default function Dashboard() {
     setTimeout(() => setSettingsSaved(false), 2000);
   }
 
-  // Stats
-  const total = sessions.length;
+  // Stats — prefer live API data, fall back to seed data
+  const total = liveStats?.totalSessions ?? sessions.length;
   const todaySessions = sessions.filter((s) => isToday(s.timestamp));
+  const todayCount = liveStats?.todaySessions ?? todaySessions.length;
   const avgDuration = sessions.length > 0
     ? Math.round(sessions.reduce((a, s) => a + s.duration, 0) / sessions.length)
     : 0;
-  const mostTriedFrame = mode(sessions.map((s) => s.frame));
+  const mostTriedFrame = liveStats?.topFrame ?? mode(sessions.map((s) => s.frame));
 
   // Face shape distribution
   const shapeCounts = FACE_SHAPES.map((sh) => ({
@@ -283,9 +335,14 @@ export default function Dashboard() {
             </div>
 
             {/* Stat cards */}
+            {statsError && (
+              <div className="mb-4 px-4 py-2 border border-brand-border text-brand-muted text-xs font-sans" style={{ borderRadius: 2 }}>
+                Could not load live data. Showing demo data. Refresh to retry.
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard label="Total Try-Ons" value={String(total)} />
-              <StatCard label="Today's Sessions" value={String(todaySessions.length)} sub="vs yesterday" />
+              <StatCard label="Total Try-Ons" value={statsLoading ? '…' : String(total)} />
+              <StatCard label="Today's Sessions" value={statsLoading ? '…' : String(todayCount)} sub={liveStats ? 'live' : 'demo data'} />
               <StatCard label="Avg Session Time" value={formatDuration(avgDuration)} />
               <StatCard label="Most Tried Frame" value={mostTriedFrame.split(' ').slice(-1)[0]} sub={mostTriedFrame} />
             </div>

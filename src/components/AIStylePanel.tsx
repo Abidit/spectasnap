@@ -55,7 +55,8 @@ function OptionButton({
   );
 }
 
-export default function AIStylePanel({ open, onClose, availableFrames, onRecommendation }: AIStylePanelProps) {
+// Preserved for re-enable when ANTHROPIC_API_KEY is configured.
+function AIStylePanelImpl({ open, onClose, availableFrames, onRecommendation }: AIStylePanelProps) {
   const [step, setStep] = useState<Step>('q1');
   const [answers, setAnswers] = useState<Answers>({
     occasion: '',
@@ -346,4 +347,10 @@ export default function AIStylePanel({ open, onClose, availableFrames, onRecomme
       )}
     </AnimatePresence>
   );
+}
+
+// Hidden — re-enable by removing this wrapper when ANTHROPIC_API_KEY is set.
+void AIStylePanelImpl; // preserve impl for future re-enable
+export default function AIStylePanel(_props: AIStylePanelProps): null {
+  return null;
 }

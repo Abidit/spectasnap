@@ -1,11 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant } from '@/lib/glasses-data';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
+import ShareModal from '@/components/ShareModal';
 import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import OfflineBanner from '@/components/OfflineBanner';
@@ -27,6 +28,10 @@ export default function TryDemo() {
   const [stylePanelOpen, setStylePanelOpen] = useState(false);
   const [arStatus, setArStatus] = useState<ARStatusKind>('idle');
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [faceShape, setFaceShape] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareDataUrl, setShareDataUrl] = useState<string | null>(null);
+  const captureRef = useRef<(() => string | null) | null>(null);
 
   // Reset color when switching frames so each frame shows its default look first
   function handleSelect(frame: GlassesFrame) {
@@ -63,6 +68,8 @@ export default function TryDemo() {
             selectedGlasses={selected}
             selectedColor={selectedColor}
             onARStatusChange={setArStatus}
+            onFaceShapeDetected={setFaceShape}
+            captureRef={captureRef}
           />
 
           </ErrorBoundary>
@@ -90,6 +97,15 @@ export default function TryDemo() {
               activeColor={selectedColor}
               onColorChange={setSelectedColor}
               onAskStaff={handleAskStaff}
+              faceShape={faceShape}
+              onSelectFrame={(id) => {
+                const f = GLASSES_COLLECTION.find((g) => g.id === id);
+                if (f) handleSelect(f);
+              }}
+              onShareLook={() => {
+                setShareDataUrl(captureRef.current?.() ?? null);
+                setShareOpen(true);
+              }}
             />
           </div>
           {/* AI Stylist CTA — hidden until ANTHROPIC_API_KEY is configured */}
@@ -154,6 +170,16 @@ export default function TryDemo() {
         onClose={() => setStylePanelOpen(false)}
         availableFrames={STYLIST_FRAMES}
         onRecommendation={handleRecommendation}
+      />
+
+      {/* Share modal */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => {
+          setShareOpen(false);
+          setShareDataUrl(null);
+        }}
+        dataUrl={shareDataUrl}
       />
 
       {/* Feedback toast — rendered at root so it composites above everything */}
