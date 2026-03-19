@@ -9,6 +9,8 @@ interface ProductCardProps {
   colorVariants?: ColorVariant[];
   activeColor?: ColorVariant | null;
   onColorChange?: (variant: ColorVariant) => void;
+  /** Called when the user taps "Ask Staff for This Frame". */
+  onAskStaff?: () => void;
 }
 
 const ALL_OCCASIONS = ['Casual', 'Office', 'Wedding', 'Sports'] as const;
@@ -18,6 +20,7 @@ export default function ProductCard({
   colorVariants,
   activeColor,
   onColorChange,
+  onAskStaff,
 }: ProductCardProps) {
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
 
@@ -168,6 +171,7 @@ export default function ProductCard({
 
         {/* CTA */}
         <button
+          onClick={onAskStaff}
           className="w-full py-3 font-sans font-semibold text-sm tracking-wide
                      bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
                      transition-all duration-150"

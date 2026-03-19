@@ -1,17 +1,21 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant } from '@/lib/glasses-data';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
+import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
+import type { ARStatusKind } from '@/components/ARStatusBadge';
 
 const ARCamera = dynamic(() => import('@/components/ARCamera'), { ssr: false });
 
 export default function TryDemo() {
   const [selected, setSelected] = useState<GlassesFrame>(GLASSES_COLLECTION[0]);
   const [selectedColor, setSelectedColor] = useState<ColorVariant | null>(null);
+  const [arStatus, setArStatus] = useState<ARStatusKind>('idle');
+  const [toast, setToast] = useState<ToastData | null>(null);
 
   // Reset color when switching frames so each frame shows its default look first
   function handleSelect(frame: GlassesFrame) {
@@ -19,16 +23,29 @@ export default function TryDemo() {
     setSelectedColor(null);
   }
 
+  const handleAskStaff = useCallback(() => {
+    setToast({
+      message: `"${selected.name}" — a staff member will assist you shortly.`,
+      type: 'success',
+    });
+  }, [selected.name]);
+
+  const dismissToast = useCallback(() => setToast(null), []);
+
   return (
     <div
       className="flex flex-col bg-brand-page"
       style={{ height: '100dvh', maxHeight: '100dvh', overflow: 'hidden' }}
     >
-      <Header />
+      <Header arStatus={arStatus} />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="relative flex-1 bg-brand-camera overflow-hidden">
-          <ARCamera selectedGlasses={selected} selectedColor={selectedColor} />
+          <ARCamera
+            selectedGlasses={selected}
+            selectedColor={selectedColor}
+            onARStatusChange={setArStatus}
+          />
 
           <div
             className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
@@ -52,6 +69,7 @@ export default function TryDemo() {
               colorVariants={selected.colorVariants}
               activeColor={selectedColor}
               onColorChange={setSelectedColor}
+              onAskStaff={handleAskStaff}
             />
           </div>
           <div className="px-6 py-4 border-t border-brand-border">
@@ -62,6 +80,7 @@ export default function TryDemo() {
         </aside>
       </div>
 
+      {/* Mobile bottom strip */}
       <div className="md:hidden border-t border-brand-border bg-brand-panel px-5 py-3">
         <div className="flex items-center justify-between">
           <div>
@@ -76,7 +95,8 @@ export default function TryDemo() {
             </p>
           </div>
           <button
-            className="px-5 font-sans font-semibold text-xs tracking-wide
+            onClick={handleAskStaff}
+            className="px-4 py-2 font-sans font-semibold text-xs tracking-wide
                        bg-brand-text text-brand-page hover:opacity-90 transition-opacity"
             style={{ borderRadius: 2, minHeight: 44 }}
           >
@@ -84,6 +104,9 @@ export default function TryDemo() {
           </button>
         </div>
       </div>
+
+      {/* Feedback toast — rendered at root so it composites above everything */}
+      <FeedbackToast toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import LandingClient from './LandingClient';
+import LandingV2 from './LandingV2';
 
 const META_DESC =
   'Try on 50+ eyeglass frames in real time from your browser — no app needed. AI face tracking for optical stores and online shoppers.';
@@ -49,7 +49,7 @@ export default function LandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
-      <LandingClient />
+      <LandingV2 />
     </>
   );
 }

@@ -2,8 +2,13 @@
 
 import Link from 'next/link';
 import { Glasses } from 'lucide-react';
+import ARStatusBadge, { type ARStatusKind } from '@/components/ARStatusBadge';
 
-export default function Header() {
+interface HeaderProps {
+  arStatus?: ARStatusKind;
+}
+
+export default function Header({ arStatus }: HeaderProps) {
   return (
     <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-brand-panel border-b border-brand-border z-10">
       {/* Logo — links back to landing page */}
@@ -22,8 +27,12 @@ export default function Header() {
         Virtual Try-On
       </p>
 
-      {/* Spacer to match layout */}
-      <div className="w-7" />
+      {/* AR status badge — or spacer to keep layout balanced */}
+      {arStatus ? (
+        <ARStatusBadge status={arStatus} />
+      ) : (
+        <div className="w-7" />
+      )}
     </header>
   );
 }
