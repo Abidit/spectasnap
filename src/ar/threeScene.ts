@@ -576,8 +576,6 @@ export function dispose(): void {
  *   Increase to make glasses larger relative to the face, decrease to shrink.
  */
 const BASE_SCALE_FACTOR = 0.72;
-// Global correction for meshes that are authored facing the opposite direction.
-const MODEL_BASE_ROTATION_Y = Math.PI;
 
 /**
  * Position, scale, and roll-rotate the active model to match the detected face.
@@ -632,7 +630,7 @@ export function applyFaceTransform(
   // (sign conventions are documented there). rotationOffset lets per-model
   // JSON config correct any mesh-orientation mismatch.
   model.rotation.x = transform.pitch + rotOff.x;
-  model.rotation.y = transform.yaw + rotOff.y + MODEL_BASE_ROTATION_Y;
+  model.rotation.y = transform.yaw + rotOff.y;
   model.rotation.z = -transform.roll + rotOff.z;
 }
 
