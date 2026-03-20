@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ProceduralPreset } from './presets';
+import { createTemplePair } from './proceduralTemples';
 
 // ---------------------------------------------------------------------------
 // Lens material presets — per-style variant (Task 1)
@@ -256,6 +257,21 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   bridge.userData.role = 'frame';
   group.add(bridge);
 
+  // ── Temple arms ──────────────────────────────────────────────────────────
+  // Temples are children of the model group so they inherit all transforms
+  // from applyFaceTransform() automatically — no per-frame landmark work.
+  const temples = createTemplePair(preset);
+
+  // Position temple hinges at the outer rim edges, upper third of the lens
+  const hingeY = preset.lensHeight * 0.3;
+  const hingeZ = -0.007 * 0.5; // aligned with rim depth
+
+  temples.left.position.set(-(halfIPD + preset.lensWidth), hingeY, hingeZ);
+  temples.right.position.set(halfIPD + preset.lensWidth, hingeY, hingeZ);
+
+  group.add(temples.left);
+  group.add(temples.right);
+
   // ── Soft shadow (Task 4) ───────────────────────────────────────────────────
   const shadowGeo = new THREE.PlaneGeometry(0.18, 0.04);
   const shadowMat = new THREE.MeshBasicMaterial({
@@ -298,7 +314,7 @@ export function updateGlassesColor(
       if (obj.userData.role === 'lens') {
         mat.color.copy(lensColor);
         mat.needsUpdate = true;
-      } else if (obj.userData.role === 'frame') {
+      } else if (obj.userData.role === 'frame' || obj.userData.role === 'temple') {
         mat.color.copy(frameColor);
         mat.needsUpdate = true;
       }

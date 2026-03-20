@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Upload, Trash2, Box, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Box, AlertCircle, CheckCircle, Wrench } from 'lucide-react';
 import Link from 'next/link';
 
 // ---------------------------------------------------------------------------
@@ -21,12 +21,21 @@ interface GLBModelMeta {
     zOffset?: number;
     boundingBox?: { width: number; height: number; depth: number };
   };
+  hasTemples?: boolean;
+  templeMeshNames?: string[];
+  templeMethod?: 'bone' | 'split' | 'none' | 'auto';
 }
 
 interface CalibrationOverride {
   scale: number;
   yOffset: number;
   zOffset: number;
+}
+
+interface TempleOverride {
+  hasTemples: boolean;
+  templeMeshNames: string;
+  templeMethod: 'auto' | 'bone' | 'split' | 'none';
 }
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
@@ -70,6 +79,7 @@ export default function AdminModelsPage() {
   const [calibrationOverrides, setCalibrationOverrides] = useState<
     Record<string, CalibrationOverride>
   >({});
+  const [templeOverrides, setTempleOverrides] = useState<Record<string, TempleOverride>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Fetch models ─────────────────────────────────────────────────────────
@@ -205,6 +215,26 @@ export default function AdminModelsPage() {
     }));
   };
 
+  // ── Temple override handler ─────────────────────────────────────────
+  const handleTempleChange = (
+    modelId: string,
+    field: keyof TempleOverride,
+    value: boolean | string,
+  ) => {
+    setTempleOverrides((prev) => {
+      const model = models.find((m) => m.id === modelId);
+      return {
+        ...prev,
+        [modelId]: {
+          hasTemples: prev[modelId]?.hasTemples ?? (model?.hasTemples ?? false),
+          templeMeshNames: prev[modelId]?.templeMeshNames ?? (model?.templeMeshNames?.join(', ') ?? ''),
+          templeMethod: prev[modelId]?.templeMethod ?? (model?.templeMethod ?? 'auto'),
+          [field]: value,
+        },
+      };
+    });
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div
@@ -232,6 +262,19 @@ export default function AdminModelsPage() {
           <ArrowLeft size={16} />
           Back
         </Link>
+        <Link
+          href="/admin/generate-glb"
+          className="flex items-center gap-1 font-sans text-sm font-semibold uppercase"
+          style={{
+            color: '#C9A96E',
+            letterSpacing: '0.12em',
+            textDecoration: 'none',
+          }}
+          aria-label="GLB Generator"
+        >
+          <Wrench size={16} />
+          GLB Generator
+        </Link>
         <div className="flex-1" />
         <h1
           className="font-serif text-xl font-semibold"
@@ -241,7 +284,7 @@ export default function AdminModelsPage() {
         </h1>
         <div className="flex-1" />
         {/* Spacer to keep title centred */}
-        <div style={{ width: 60 }} />
+        <div style={{ width: 160 }} />
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
@@ -445,6 +488,11 @@ export default function AdminModelsPage() {
               {models.map((model) => {
                 const overrides = calibrationOverrides[model.id];
                 const cal = model.calibration;
+                const temples = templeOverrides[model.id] ?? {
+                  hasTemples: model.hasTemples ?? false,
+                  templeMeshNames: model.templeMeshNames?.join(', ') ?? '',
+                  templeMethod: (model.templeMethod ?? 'auto') as 'auto' | 'bone' | 'split' | 'none',
+                };
                 return (
                   <div
                     key={model.id}
@@ -614,6 +662,102 @@ export default function AdminModelsPage() {
                             className="w-full accent-[#C9A96E]"
                           />
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Temple Detection section */}
+                    <div
+                      className="mt-3 p-3 border text-xs font-sans"
+                      style={{
+                        borderColor: '#DDD8CE',
+                        borderRadius: 2,
+                      }}
+                    >
+                      <p
+                        className="font-semibold uppercase mb-2"
+                        style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
+                      >
+                        Temple Detection
+                      </p>
+
+                      {/* Has Temples toggle */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <label htmlFor={`has-temples-${model.id}`} style={{ color: '#6B6560' }}>
+                          Has Temple Arms
+                        </label>
+                        <button
+                          id={`has-temples-${model.id}`}
+                          role="switch"
+                          aria-checked={temples.hasTemples}
+                          onClick={() => handleTempleChange(model.id, 'hasTemples', !temples.hasTemples)}
+                          className="relative w-9 h-5 transition-colors"
+                          style={{
+                            backgroundColor: temples.hasTemples ? '#C9A96E' : '#DDD8CE',
+                            borderRadius: 2,
+                          }}
+                        >
+                          <span
+                            className="absolute top-0.5 left-0.5 w-4 h-4 transition-transform"
+                            style={{
+                              backgroundColor: '#FDFAF4',
+                              borderRadius: 2,
+                              transform: temples.hasTemples ? 'translateX(16px)' : 'translateX(0)',
+                            }}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Temple Mesh Names */}
+                      <div className="mb-3">
+                        <label
+                          htmlFor={`temple-names-${model.id}`}
+                          className="block mb-1"
+                          style={{ color: '#6B6560' }}
+                        >
+                          Temple Mesh Names (comma-separated)
+                        </label>
+                        <input
+                          id={`temple-names-${model.id}`}
+                          type="text"
+                          value={temples.templeMeshNames}
+                          onChange={(e) => handleTempleChange(model.id, 'templeMeshNames', e.target.value)}
+                          placeholder="temple_left, temple_right"
+                          className="w-full px-2 py-1 text-xs font-sans border outline-none focus:ring-1"
+                          style={{
+                            borderColor: '#DDD8CE',
+                            borderRadius: 2,
+                            backgroundColor: '#FDFAF4',
+                            color: '#1A1612',
+                          }}
+                        />
+                      </div>
+
+                      {/* Temple Method dropdown */}
+                      <div>
+                        <label
+                          htmlFor={`temple-method-${model.id}`}
+                          className="block mb-1"
+                          style={{ color: '#6B6560' }}
+                        >
+                          Temple Method
+                        </label>
+                        <select
+                          id={`temple-method-${model.id}`}
+                          value={temples.templeMethod}
+                          onChange={(e) => handleTempleChange(model.id, 'templeMethod', e.target.value)}
+                          className="w-full px-2 py-1 text-xs font-sans border outline-none focus:ring-1"
+                          style={{
+                            borderColor: '#DDD8CE',
+                            borderRadius: 2,
+                            backgroundColor: '#FDFAF4',
+                            color: '#1A1612',
+                          }}
+                        >
+                          <option value="auto">Auto Detect</option>
+                          <option value="bone">Bone-based</option>
+                          <option value="split">Split Group</option>
+                          <option value="none">None (No Temples)</option>
+                        </select>
                       </div>
                     </div>
                   </div>
