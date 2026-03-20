@@ -28,87 +28,180 @@ const SIDE_TRIANGLES: number[] = [
   SIDE_BASE + 2, 356, 389,
 ];
 
-let occluderMesh: THREE.Mesh | null = null;
-let occluderGeometry: THREE.BufferGeometry | null = null;
-let positionAttr: THREE.BufferAttribute | null = null;
-let occluderCamera: THREE.PerspectiveCamera | null = null;
-let occlusionEnabled = true;
-let debugOcclusion = false;
+const TOTAL_VERTS = FACE_VERTEX_COUNT + SIDE_LM.length;
 
-let solidMat: THREE.MeshBasicMaterial | null = null;
-let debugOccMat: THREE.MeshBasicMaterial | null = null;
+// ---------------------------------------------------------------------------
+// FaceOccluder — per-face occluder instance
+// ---------------------------------------------------------------------------
+
+/**
+ * Self-contained face occluder. Each instance owns its own mesh, geometry,
+ * and position buffer so multiple faces can be occluded independently.
+ */
+export class FaceOccluder {
+  mesh: THREE.Mesh;
+  geometry: THREE.BufferGeometry;
+  positionAttr: THREE.BufferAttribute;
+  solidMat: THREE.MeshBasicMaterial;
+  debugMat: THREE.MeshBasicMaterial;
+  camera: THREE.PerspectiveCamera | null = null;
+  enabled = true;
+  debug = false;
+
+  constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
+    const positions = new Float32Array(TOTAL_VERTS * 3);
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const allIndices = [...TRIANGULATION, ...SIDE_TRIANGLES];
+    this.geometry.setIndex(allIndices);
+
+    this.solidMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      colorWrite: false,
+      depthWrite: true,
+      depthTest: true,
+      side: THREE.FrontSide,
+    });
+
+    this.debugMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      colorWrite: true,
+      depthWrite: true,
+      depthTest: true,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.FrontSide,
+      wireframe: false,
+    });
+
+    this.mesh = new THREE.Mesh(this.geometry, this.solidMat);
+    this.mesh.renderOrder = 0;
+    this.mesh.visible = false;
+    this.mesh.frustumCulled = false;
+    this.mesh.scale.setScalar(1.01);
+
+    this.positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+    if (camera) this.camera = camera;
+
+    scene.add(this.mesh);
+  }
+
+  update(landmarks: NormalizedLandmark[], videoW: number, videoH: number): void {
+    if (!this.enabled || !this.camera) {
+      this.mesh.visible = false;
+      return;
+    }
+
+    if (landmarks.length < 468 || videoW <= 0 || videoH <= 0) {
+      this.mesh.visible = false;
+      return;
+    }
+
+    const tanHalfFOV = Math.tan((this.camera.fov / 2) * (Math.PI / 180));
+    const halfH = this.camera.position.z * tanHalfFOV;
+    const halfW = halfH * this.camera.aspect;
+    const depthScale = halfW * 2;
+
+    const count = Math.min(landmarks.length, FACE_VERTEX_COUNT);
+    for (let i = 0; i < count; i++) {
+      const lm = landmarks[i];
+      const offset = i * 3;
+
+      // Mirror X to match the camera canvas transform in ARCamera.
+      const ndcX = (1 - lm.x) * 2 - 1;
+      const ndcY = -(lm.y * 2 - 1);
+
+      this.positionAttr.array[offset]     = ndcX * halfW;
+      this.positionAttr.array[offset + 1] = ndcY * halfH;
+      this.positionAttr.array[offset + 2] = THREE.MathUtils.clamp(-lm.z * depthScale, -0.25, 0.25);
+    }
+
+    // Zero any trailing face vertices (iris region 468-477 if landmarks < 478).
+    for (let i = count; i < FACE_VERTEX_COUNT; i++) {
+      const offset = i * 3;
+      this.positionAttr.array[offset] = 0;
+      this.positionAttr.array[offset + 1] = 0;
+      this.positionAttr.array[offset + 2] = 0;
+    }
+
+    // ── Side-face anchor vertices (beyond FACE_VERTEX_COUNT) ──────────────────
+    for (let s = 0; s < SIDE_LM.length; s++) {
+      const srcIdx = SIDE_LM[s];
+      const dstBase = (FACE_VERTEX_COUNT + s) * 3;
+      this.positionAttr.array[dstBase]     = this.positionAttr.array[srcIdx * 3];
+      this.positionAttr.array[dstBase + 1] = this.positionAttr.array[srcIdx * 3 + 1];
+      this.positionAttr.array[dstBase + 2] = this.positionAttr.array[srcIdx * 3 + 2] + 0.012;
+    }
+
+    this.positionAttr.needsUpdate = true;
+    this.mesh.visible = true;
+  }
+
+  hide(): void {
+    this.mesh.visible = false;
+  }
+
+  setDebug(on: boolean): void {
+    this.debug = on;
+    this.mesh.material = on ? this.debugMat : this.solidMat;
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.mesh.visible = false;
+  }
+
+  setCamera(camera: THREE.PerspectiveCamera): void {
+    this.camera = camera;
+  }
+
+  dispose(): void {
+    this.mesh.parent?.remove(this.mesh);
+    this.solidMat.dispose();
+    this.debugMat.dispose();
+    this.geometry.dispose();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-face occluder pool
+// ---------------------------------------------------------------------------
+
+const occluderPool: (FaceOccluder | null)[] = [null, null, null];
+
+// ---------------------------------------------------------------------------
+// Backward-compatible API (wraps pool slot 0)
+// ---------------------------------------------------------------------------
 
 export function buildOccluderMesh(
   scene: THREE.Scene,
   camera?: THREE.PerspectiveCamera,
 ): THREE.Mesh {
-  if (occluderMesh) {
-    if (camera) occluderCamera = camera;
-    return occluderMesh;
+  if (!occluderPool[0]) {
+    occluderPool[0] = new FaceOccluder(scene, camera);
+  } else if (camera) {
+    occluderPool[0].setCamera(camera);
   }
-
-  // Allocate enough for 478 face verts + 6 side anchors.
-  const TOTAL_VERTS = FACE_VERTEX_COUNT + SIDE_LM.length;
-  const positions = new Float32Array(TOTAL_VERTS * 3);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-  // Combine base triangulation with side-face extension triangles.
-  const allIndices = [...TRIANGULATION, ...SIDE_TRIANGLES];
-  geometry.setIndex(allIndices);
-
-  solidMat = new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    colorWrite: false,
-    depthWrite: true,
-    depthTest: true,
-    side: THREE.FrontSide,
-  });
-
-  debugOccMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffff,
-    colorWrite: true,
-    depthWrite: true,
-    depthTest: true,
-    transparent: true,
-    opacity: 0.35,
-    side: THREE.FrontSide,
-    wireframe: false,
-  });
-
-  const mesh = new THREE.Mesh(geometry, solidMat);
-  mesh.renderOrder = 0;
-  mesh.visible = false;
-  mesh.frustumCulled = false;
-  mesh.scale.setScalar(1.01); // Slight enlargement for face coverage — 1.01 avoids nose-bridge clipping lenses
-
-  scene.add(mesh);
-
-  occluderMesh = mesh;
-  occluderGeometry = geometry;
-  positionAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
-  if (camera) occluderCamera = camera;
-
-  return mesh;
+  return occluderPool[0].mesh;
 }
 
 export function setOccluderDebug(on: boolean): void {
-  debugOcclusion = on;
-  if (!occluderMesh || !solidMat || !debugOccMat) return;
-  occluderMesh.material = on ? debugOccMat : solidMat;
+  occluderPool[0]?.setDebug(on);
 }
 
 export function setOccluderCamera(camera: THREE.PerspectiveCamera): void {
-  occluderCamera = camera;
+  occluderPool[0]?.setCamera(camera);
 }
 
 export function setOcclusionEnabled(enabled: boolean): void {
-  occlusionEnabled = enabled;
-  if (!enabled && occluderMesh) occluderMesh.visible = false;
+  for (const occ of occluderPool) {
+    occ?.setEnabled(enabled);
+  }
 }
 
 export function hideOccluder(): void {
-  if (occluderMesh) occluderMesh.visible = false;
+  occluderPool[0]?.hide();
 }
 
 export function updateOccluder(
@@ -116,76 +209,53 @@ export function updateOccluder(
   videoW: number,
   videoH: number,
 ): void {
-  if (!occlusionEnabled || !occluderMesh || !occluderGeometry || !positionAttr || !occluderCamera) {
-    if (occluderMesh) occluderMesh.visible = false;
-    return;
-  }
-
-  if (landmarks.length < 468 || videoW <= 0 || videoH <= 0) {
-    occluderMesh.visible = false;
-    return;
-  }
-
-  const tanHalfFOV = Math.tan((occluderCamera.fov / 2) * (Math.PI / 180));
-  const halfH = occluderCamera.position.z * tanHalfFOV;
-  const halfW = halfH * occluderCamera.aspect;
-  const depthScale = halfW * 2;
-
-  const count = Math.min(landmarks.length, FACE_VERTEX_COUNT);
-  for (let i = 0; i < count; i++) {
-    const lm = landmarks[i];
-    const offset = i * 3;
-
-    // Mirror X to match the camera canvas transform in ARCamera.
-    const ndcX = (1 - lm.x) * 2 - 1;
-    const ndcY = -(lm.y * 2 - 1);
-
-    positionAttr.array[offset]     = ndcX * halfW;
-    positionAttr.array[offset + 1] = ndcY * halfH;
-    positionAttr.array[offset + 2] = THREE.MathUtils.clamp(-lm.z * depthScale, -0.25, 0.25);
-  }
-
-  // Zero any trailing face vertices (iris region 468-477 if landmarks < 478).
-  for (let i = count; i < FACE_VERTEX_COUNT; i++) {
-    const offset = i * 3;
-    positionAttr.array[offset] = 0;
-    positionAttr.array[offset + 1] = 0;
-    positionAttr.array[offset + 2] = 0;
-  }
-
-  // ── Side-face anchor vertices (beyond FACE_VERTEX_COUNT) ──────────────────
-  // Push them slightly forward (toward camera) so they reliably occlude temples.
-  for (let s = 0; s < SIDE_LM.length; s++) {
-    const srcIdx = SIDE_LM[s];
-    const dstBase = (FACE_VERTEX_COUNT + s) * 3;
-    positionAttr.array[dstBase]     = positionAttr.array[srcIdx * 3];
-    positionAttr.array[dstBase + 1] = positionAttr.array[srcIdx * 3 + 1];
-    // Slightly in front of face surface to ensure occlusion.
-    positionAttr.array[dstBase + 2] = positionAttr.array[srcIdx * 3 + 2] + 0.012;
-  }
-
-  positionAttr.needsUpdate = true;
-  occluderMesh.visible = true;
+  occluderPool[0]?.update(landmarks, videoW, videoH);
 }
 
 export function disposeOccluder(): void {
-  if (occluderMesh) {
-    occluderMesh.parent?.remove(occluderMesh);
-    const material = occluderMesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((mat) => mat.dispose());
-    } else {
-      material.dispose();
-    }
+  for (let i = 0; i < occluderPool.length; i++) {
+    occluderPool[i]?.dispose();
+    occluderPool[i] = null;
   }
-  occluderGeometry?.dispose();
-  solidMat?.dispose();
-  debugOccMat?.dispose();
+}
 
-  occluderMesh = null;
-  occluderGeometry = null;
-  positionAttr = null;
-  occluderCamera = null;
-  solidMat = null;
-  debugOccMat = null;
+// ---------------------------------------------------------------------------
+// Multi-face occluder API
+// ---------------------------------------------------------------------------
+
+/**
+ * Create (or return existing) occluder for a specific face index.
+ * Face 0 uses the backward-compatible slot; faces 1-2 are additional.
+ */
+export function buildOccluderForFace(
+  faceIndex: number,
+  scene: THREE.Scene,
+  camera: THREE.PerspectiveCamera,
+): FaceOccluder {
+  if (!occluderPool[faceIndex]) {
+    occluderPool[faceIndex] = new FaceOccluder(scene, camera);
+  } else {
+    occluderPool[faceIndex]!.setCamera(camera);
+  }
+  return occluderPool[faceIndex]!;
+}
+
+export function updateOccluderForFace(
+  faceIndex: number,
+  landmarks: NormalizedLandmark[],
+  videoW: number,
+  videoH: number,
+): void {
+  occluderPool[faceIndex]?.update(landmarks, videoW, videoH);
+}
+
+export function hideOccluderForFace(faceIndex: number): void {
+  occluderPool[faceIndex]?.hide();
+}
+
+export function disposeAllOccluders(): void {
+  for (let i = 0; i < occluderPool.length; i++) {
+    occluderPool[i]?.dispose();
+    occluderPool[i] = null;
+  }
 }

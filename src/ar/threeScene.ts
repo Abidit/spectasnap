@@ -22,6 +22,10 @@ import {
   setOccluderDebug,
   setOcclusionEnabled as setOccluderEnabled,
   updateOccluder,
+  buildOccluderForFace,
+  updateOccluderForFace,
+  hideOccluderForFace,
+  disposeAllOccluders,
 } from './occluder';
 import { createProceduralGlasses, updateGlassesColor } from './proceduralGlasses';
 import { getProceduralPreset } from './presets';
@@ -78,6 +82,39 @@ interface OverlayState {
 // ---------------------------------------------------------------------------
 
 let state: OverlayState | null = null;
+
+// ---------------------------------------------------------------------------
+// Multi-face slot system — renders glasses on up to 3 faces simultaneously
+// ---------------------------------------------------------------------------
+
+const MAX_FACES = 3;
+
+interface FaceSlot {
+  model: THREE.Group;
+  modelId: string; // tracks which activeId this was cloned from
+  lastOpacity: number;
+}
+
+/** Face slots: index 0 is always the primary (uses existing active model). */
+const faceSlots: (FaceSlot | null)[] = [null, null, null];
+
+/**
+ * Deep-clone a THREE.Group including material instances so each face
+ * can have independent opacity / color without affecting others.
+ */
+function cloneWithMaterials(source: THREE.Group): THREE.Group {
+  const clone = source.clone(true);
+  clone.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      if (Array.isArray(obj.material)) {
+        obj.material = obj.material.map((m: THREE.Material) => m.clone());
+      } else {
+        obj.material = obj.material.clone();
+      }
+    }
+  });
+  return clone;
+}
 const DEFAULT_OCCLUSION_ENABLED = true;
 
 // ---------------------------------------------------------------------------
@@ -512,6 +549,9 @@ export function setActiveModel(id: string | null): void {
       model.visible = true;
     }
   }
+
+  // Re-create secondary face slots for the new active model.
+  syncFaceSlotsToActiveModel();
 }
 
 // ---------------------------------------------------------------------------
@@ -556,7 +596,9 @@ export function dispose(): void {
   });
 
   state.cache.clear();
-  disposeOccluder();
+  // Clean up all face slots and occluders.
+  for (let i = 1; i < MAX_FACES; i++) clearFaceSlot(i);
+  disposeAllOccluders();
   state.envTexture?.dispose();
   state.scene.environment = null;
   state.renderer.dispose();
@@ -703,6 +745,10 @@ export function setModelColor(frameHex: string, lensHex: string): void {
   if (!state) return;
   const model = getActiveModel();
   if (model) updateGlassesColor(model, frameHex, lensHex);
+  // Propagate to secondary face slots.
+  for (let i = 1; i < MAX_FACES; i++) {
+    if (faceSlots[i]?.model) updateGlassesColor(faceSlots[i]!.model, frameHex, lensHex);
+  }
 }
 
 export function updateFaceOccluder(
@@ -736,11 +782,8 @@ export function setOcclusionDebug(on: boolean): void {
  * Update only the lens material properties for a tint variant.
  * Leaves frame color unchanged.
  */
-export function setLensTint(tint: LensTint): void {
-  if (!state) return;
-  const model = getActiveModel();
-  if (!model) return;
-
+/** Apply a lens tint to a specific model group. */
+function applyTintToModel(model: THREE.Group, tint: LensTint): void {
   const lensColor = new THREE.Color(tint.lensHex);
   model.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'lens') return;
@@ -754,6 +797,16 @@ export function setLensTint(tint: LensTint): void {
   });
 }
 
+export function setLensTint(tint: LensTint): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (model) applyTintToModel(model, tint);
+  // Propagate to secondary face slots.
+  for (let i = 1; i < MAX_FACES; i++) {
+    if (faceSlots[i]?.model) applyTintToModel(faceSlots[i]!.model, tint);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // setLensCoating — toggle anti-reflective coating simulation (Task 8.2)
 // ---------------------------------------------------------------------------
@@ -762,11 +815,8 @@ export function setLensTint(tint: LensTint): void {
  * Toggle anti-reflective coating simulation on lens materials.
  * Uses Three.js iridescence properties (available in r149+).
  */
-export function setLensCoating(enabled: boolean): void {
-  if (!state) return;
-  const model = getActiveModel();
-  if (!model) return;
-
+/** Apply lens coating to a specific model group. */
+function applyCoatingToModel(model: THREE.Group, enabled: boolean): void {
   model.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'lens') return;
     const mat = obj.material as THREE.MeshPhysicalMaterial;
@@ -779,6 +829,16 @@ export function setLensCoating(enabled: boolean): void {
     }
     mat.needsUpdate = true;
   });
+}
+
+export function setLensCoating(enabled: boolean): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (model) applyCoatingToModel(model, enabled);
+  // Propagate to secondary face slots.
+  for (let i = 1; i < MAX_FACES; i++) {
+    if (faceSlots[i]?.model) applyCoatingToModel(faceSlots[i]!.model, enabled);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -830,6 +890,187 @@ export function registerGLBModel(
     rotationOffset: { x: 0, y: 0, z: 0 },
   };
   state.registry.set(id, cfg);
+}
+
+// ---------------------------------------------------------------------------
+// Multi-face slot API
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure a face slot exists for the given face index.
+ * Slot 0 always uses the existing active model (no-op).
+ * Slots 1-2 clone the active model for independent transforms.
+ */
+export function ensureFaceSlot(faceIndex: number): void {
+  if (faceIndex === 0 || !state || !state.activeId) return;
+  if (faceIndex >= MAX_FACES) return;
+
+  const slot = faceSlots[faceIndex];
+  // Already created for the current active model — skip.
+  if (slot && slot.modelId === state.activeId) return;
+
+  // Tear down old slot if model changed.
+  if (slot) clearFaceSlot(faceIndex);
+
+  const cfg = state.registry.get(state.activeId);
+  if (!cfg) return;
+
+  let model: THREE.Group;
+  if (cfg.type === 'procedural' && cfg.presetId) {
+    // Create a fresh procedural model (independent geometry + materials).
+    const preset = getProceduralPreset(cfg.presetId);
+    if (!preset) return;
+    model = createProceduralGlasses(preset);
+  } else {
+    // Clone the primary model with independent materials.
+    const primary = state.cache.get(state.activeId);
+    if (!primary) return;
+    model = cloneWithMaterials(primary);
+  }
+
+  setRenderOrderRecursive(model, 1);
+  model.visible = true;
+  state.modelGroup.add(model);
+
+  // Build occluder for this face.
+  buildOccluderForFace(faceIndex, state.scene, state.camera);
+
+  faceSlots[faceIndex] = {
+    model,
+    modelId: state.activeId,
+    lastOpacity: 1,
+  };
+}
+
+/**
+ * Apply face transform to a specific face index.
+ * Index 0 delegates to the existing applyFaceTransform.
+ */
+export function applyFaceTransformMulti(
+  faceIndex: number,
+  transform: FaceTransform,
+  canvasW: number,
+  canvasH: number,
+): void {
+  if (!state) return;
+
+  if (faceIndex === 0) {
+    applyFaceTransform(transform, canvasW, canvasH);
+    return;
+  }
+
+  const slot = faceSlots[faceIndex];
+  if (!slot) return;
+
+  const { camera } = state;
+  const cfg = state.activeId ? state.registry.get(state.activeId) : undefined;
+  const rotOff = cfg?.rotationOffset ?? { x: 0, y: 0, z: 0 };
+  const posOff = cfg?.offset ?? { x: 0, y: 0, z: 0 };
+  const scaleMultiplier = cfg?.scaleMultiplier ?? 1;
+
+  const tanHalfFOV = Math.tan((camera.fov / 2) * (Math.PI / 180));
+  const halfH = camera.position.z * tanHalfFOV;
+  const halfW = halfH * camera.aspect;
+
+  const ndcX =  (transform.cx / canvasW) * 2 - 1;
+  const ndcY = -((transform.cy / canvasH) * 2 - 1);
+
+  slot.model.position.x = ndcX * halfW + posOff.x;
+  slot.model.position.y = ndcY * halfH + posOff.y;
+  slot.model.position.z = posOff.z;
+
+  const ipdWorld = (transform.ipd / canvasW) * (halfW * 2);
+  slot.model.scale.setScalar(ipdWorld * BASE_SCALE_FACTOR * scaleMultiplier);
+
+  slot.model.rotation.x = transform.pitch + rotOff.x;
+  slot.model.rotation.y = transform.yaw + rotOff.y;
+  slot.model.rotation.z = -transform.roll + rotOff.z;
+}
+
+/**
+ * Update the face occluder for a specific face index.
+ * Index 0 delegates to the existing updateFaceOccluder.
+ */
+export function updateFaceOccluderMulti(
+  faceIndex: number,
+  landmarks: NormalizedLandmark[],
+  canvasW: number,
+  canvasH: number,
+): void {
+  if (!state) return;
+  if (faceIndex === 0) {
+    updateOccluder(landmarks, canvasW, canvasH);
+  } else {
+    updateOccluderForFace(faceIndex, landmarks, canvasW, canvasH);
+  }
+}
+
+/**
+ * Set opacity for a specific face slot.
+ * Index 0 delegates to the existing setModelOpacity.
+ */
+export function setFaceSlotOpacity(faceIndex: number, opacity: number): void {
+  if (!state) return;
+
+  if (faceIndex === 0) {
+    setModelOpacity(opacity);
+    return;
+  }
+
+  const slot = faceSlots[faceIndex];
+  if (!slot) return;
+
+  const clamped = Math.max(0, Math.min(1, opacity));
+  slot.lastOpacity = clamped;
+  slot.model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats as THREE.Material[]) {
+      if (!('opacity' in mat)) continue;
+      (mat as THREE.MeshStandardMaterial).transparent = clamped < 1;
+      (mat as THREE.MeshStandardMaterial).opacity = clamped;
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+/**
+ * Clear a face slot — remove its model from the scene and dispose resources.
+ * Index 0 just hides the active model + occluder.
+ */
+export function clearFaceSlot(faceIndex: number): void {
+  if (faceIndex === 0) {
+    setModelOpacity(0);
+    hideOccluder();
+    return;
+  }
+
+  const slot = faceSlots[faceIndex];
+  if (!slot) return;
+
+  slot.model.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      obj.geometry.dispose();
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((m) => m.dispose());
+    }
+  });
+  state?.modelGroup.remove(slot.model);
+  hideOccluderForFace(faceIndex);
+  faceSlots[faceIndex] = null;
+}
+
+/**
+ * Re-create all secondary face slots to match the current active model.
+ * Called internally when the user switches frames.
+ */
+function syncFaceSlotsToActiveModel(): void {
+  for (let i = 1; i < MAX_FACES; i++) {
+    if (faceSlots[i]) {
+      clearFaceSlot(i);
+      // Slot will be re-created on next ensureFaceSlot() call from ARCamera.
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

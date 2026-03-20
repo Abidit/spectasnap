@@ -83,10 +83,11 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
   const rafRef = useRef<number>(0);
   const glassesImgRef = useRef<HTMLImageElement | null>(null);
   const lastFrameTimeRef = useRef<number>(-1);
-  const smoothedTransformRef = useRef<FaceTransform | null>(null);
-  const kalmanBankRef = useRef<KalmanBank | null>(null);
+  const MAX_FACES = 3;
+  const smoothedTransformsRef = useRef<(FaceTransform | null)[]>([null, null, null]);
+  const kalmanBanksRef = useRef<(KalmanBank | null)[]>([null, null, null]);
   const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
-  const faceLastSeenRef = useRef<number>(-Infinity);
+  const facesLastSeenRef = useRef<number[]>([-Infinity, -Infinity, -Infinity]);
   const faceShapeDetectedRef = useRef(false);
   const pdMeasurerRef = useRef<PDMeasurer | null>(null);
   const pdMeasurementRef = useRef<PDMeasurement | null>(null);
@@ -144,9 +145,9 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    smoothedTransformRef.current = null;
-    kalmanBankRef.current = null;
-    faceLastSeenRef.current = -Infinity;
+    smoothedTransformsRef.current = [null, null, null];
+    kalmanBanksRef.current = [null, null, null];
+    facesLastSeenRef.current = [-Infinity, -Infinity, -Infinity];
     pdMeasurerRef.current?.reset();
     pdMeasurerRef.current = null;
     glassesDetectorRef.current?.reset();
@@ -195,124 +196,142 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
       const result = landmarker.detectForVideo(video, videoTimestampMs);
 
       if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-        faceLastSeenRef.current = now;
+        const faceCount = Math.min(result.faceLandmarks.length, MAX_FACES);
         setFaceDetected(true);
-        setMultipleFaces(result.faceLandmarks.length > 1);
+        setMultipleFaces(faceCount > 1);
 
-        // Detect face shape + create session on first tracked frame
-        if (!faceShapeDetectedRef.current) {
-          faceShapeDetectedRef.current = true;
-          const shape = computeFaceShape(result.faceLandmarks[0]);
-          setDetectedFaceShape(shape);
+        for (let fi = 0; fi < faceCount; fi++) {
+          const landmarks = result.faceLandmarks[fi];
+          facesLastSeenRef.current[fi] = now;
 
-          // Create session record
-          const store =
-            typeof window !== 'undefined'
-              ? new URLSearchParams(window.location.search).get('store') || 'default'
-              : 'default';
-          sessionRef.current = {
-            store,
-            faceShape: shape,
-            framesTried: [],
-            startTime: Date.now(),
-          };
-        }
+          // ── PRIMARY FACE ONLY (fi === 0) ──────────────────────────────────
+          if (fi === 0) {
+            // Detect face shape + create session on first tracked frame
+            if (!faceShapeDetectedRef.current) {
+              faceShapeDetectedRef.current = true;
+              const shape = computeFaceShape(landmarks);
+              setDetectedFaceShape(shape);
 
-        // Track frame switches in session
-        if (sessionRef.current) {
-          const id = selectedGlasses.id;
-          if (!sessionRef.current.framesTried.includes(id)) {
-            sessionRef.current.framesTried.push(id);
+              const store =
+                typeof window !== 'undefined'
+                  ? new URLSearchParams(window.location.search).get('store') || 'default'
+                  : 'default';
+              sessionRef.current = {
+                store,
+                faceShape: shape,
+                framesTried: [],
+                startTime: Date.now(),
+              };
+            }
+
+            // Track frame switches in session
+            if (sessionRef.current) {
+              const id = selectedGlasses.id;
+              if (!sessionRef.current.framesTried.includes(id)) {
+                sessionRef.current.framesTried.push(id);
+              }
+            }
+
+            // Inpaint existing glasses if removal is enabled
+            if (glassesRemoval) {
+              if (!glassesDetectorRef.current) {
+                glassesDetectorRef.current = createGlassesDetector();
+              }
+              const wearing = glassesDetectorRef.current.detect(landmarks);
+              if (wearing) {
+                inpaintGlasses(ctx, landmarks, canvas.width, canvas.height);
+              }
+            }
+
+            // 2D fallback overlay
+            const img = glassesImgRef.current;
+            if (img) {
+              drawGlassesOnCanvas(ctx, landmarks, img, selectedGlasses, canvas.width, canvas.height);
+            }
+
+            // PD measurement (primary face only)
+            if (pdMeasuring && onPDMeasured) {
+              if (!pdMeasurerRef.current) pdMeasurerRef.current = createPDMeasurer();
+              const pd = pdMeasurerRef.current.update(landmarks, canvas.width, canvas.height);
+              onPDMeasured(pd);
+              drawPDOverlay(ctx, landmarks, canvas.width, canvas.height, pd.pdMm);
+            }
+          }
+
+          // ── ALL FACES: 3-D glasses tracking ─────────────────────────────
+          // Ensure face slot exists for secondary faces
+          if (fi > 0) threeSceneRef.current?.ensureFaceSlot(fi);
+
+          // Compute and smooth transform
+          const raw = computeTransform(landmarks, canvas.width, canvas.height);
+          if (!kalmanBanksRef.current[fi]) kalmanBanksRef.current[fi] = createKalmanBank();
+          const smoothed = smoothKalman(kalmanBanksRef.current[fi]!, raw);
+          smoothedTransformsRef.current[fi] = smoothed;
+
+          // Apply face transform + occluder
+          threeSceneRef.current?.applyFaceTransformMulti(fi, smoothed, canvas.width, canvas.height);
+          threeSceneRef.current?.updateFaceOccluderMulti(fi, landmarks, canvas.width, canvas.height);
+
+          // GLB temple animation (primary face only — secondary uses inherited transforms)
+          if (fi === 0) {
+            threeSceneRef.current?.animateGLBTemples(landmarks, smoothed, canvas.width, canvas.height);
+          }
+
+          // Yaw fade per face
+          const absYaw = Math.abs(smoothed.yaw);
+          if (absYaw > 0.42) {
+            const fade = 1 - (absYaw - 0.42) / 0.16;
+            threeSceneRef.current?.setFaceSlotOpacity(fi, Math.max(0, fade));
+          } else {
+            threeSceneRef.current?.setFaceSlotOpacity(fi, 1);
           }
         }
 
-        // Inpaint existing glasses if removal is enabled and glasses are detected
-        if (glassesRemoval) {
-          if (!glassesDetectorRef.current) {
-            glassesDetectorRef.current = createGlassesDetector();
+        // ── Clear disappeared faces ─────────────────────────────────────
+        for (let fi = faceCount; fi < MAX_FACES; fi++) {
+          if (prefersReducedMotionRef.current) {
+            threeSceneRef.current?.setFaceSlotOpacity(fi, 0);
+            threeSceneRef.current?.clearFaceSlot(fi);
+          } else {
+            const elapsed = now - facesLastSeenRef.current[fi];
+            if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformsRef.current[fi]) {
+              threeSceneRef.current?.applyFaceTransformMulti(
+                fi, smoothedTransformsRef.current[fi]!, canvas.width, canvas.height
+              );
+              const opacity = elapsed < FACE_HOLD_MS
+                ? 1
+                : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
+              threeSceneRef.current?.setFaceSlotOpacity(fi, opacity);
+            } else {
+              threeSceneRef.current?.setFaceSlotOpacity(fi, 0);
+              threeSceneRef.current?.clearFaceSlot(fi);
+            }
           }
-          const wearing = glassesDetectorRef.current.detect(result.faceLandmarks[0]);
-          if (wearing) {
-            inpaintGlasses(ctx, result.faceLandmarks[0], canvas.width, canvas.height);
-          }
-        }
-
-        const img = glassesImgRef.current;
-        if (img) {
-          drawGlassesOnCanvas(
-            ctx,
-            result.faceLandmarks[0],
-            img,
-            selectedGlasses,
-            canvas.width,
-            canvas.height
-          );
-        }
-
-        // ── 3-D glasses tracking ─────────────────────────────────────────
-        const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
-        // Kalman filter for near-zero jitter (Task 5)
-        if (!kalmanBankRef.current) kalmanBankRef.current = createKalmanBank();
-        const smoothed = smoothKalman(kalmanBankRef.current, raw);
-        smoothedTransformRef.current = smoothed;
-        threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
-        threeSceneRef.current?.updateFaceOccluder(
-          result.faceLandmarks[0],
-          canvas.width,
-          canvas.height
-        );
-
-        // ── GLB temple arm animation (Task B.4) ───────────────────────────
-        threeSceneRef.current?.animateGLBTemples(
-          result.faceLandmarks[0],
-          smoothed,
-          canvas.width,
-          canvas.height,
-        );
-
-        // ── PD measurement (when active) ──────────────────────────────────
-        if (pdMeasuring && onPDMeasured) {
-          if (!pdMeasurerRef.current) pdMeasurerRef.current = createPDMeasurer();
-          const pd = pdMeasurerRef.current.update(
-            result.faceLandmarks[0],
-            canvas.width,
-            canvas.height,
-          );
-          onPDMeasured(pd);
-
-          // Draw PD overlay on the 2D canvas (iris markers + dashed line + value)
-          drawPDOverlay(ctx, result.faceLandmarks[0], canvas.width, canvas.height, pd.pdMm);
-        }
-
-        // Yaw fade: smoothly fade glasses past ~24°, fully gone by ~33° (just under YAW_MAX)
-        const absYaw = Math.abs(smoothed.yaw);
-        if (absYaw > 0.42) {
-          const fade = 1 - (absYaw - 0.42) / 0.16;
-          threeSceneRef.current?.setModelOpacity(Math.max(0, fade));
-        } else {
-          threeSceneRef.current?.setModelOpacity(1);
         }
       } else {
+        // ── No faces detected ───────────────────────────────────────────
         setFaceDetected(false);
         setMultipleFaces(false);
-        threeSceneRef.current?.clearFaceOccluder();
 
-        // ── Stability: hold 500 ms, then fade over 300 ms ─────────────────
-        // If user prefers reduced motion, skip the fade and hide immediately
-        if (prefersReducedMotionRef.current) {
-          threeSceneRef.current?.setModelOpacity(0);
-        } else {
-          const elapsed = now - faceLastSeenRef.current;
-          if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformRef.current) {
-            threeSceneRef.current?.applyFaceTransform(
-              smoothedTransformRef.current,
-              canvas.width,
-              canvas.height
-            );
-            const opacity = elapsed < FACE_HOLD_MS ? 1 : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
-            threeSceneRef.current?.setModelOpacity(opacity);
+        for (let fi = 0; fi < MAX_FACES; fi++) {
+          if (fi === 0) threeSceneRef.current?.clearFaceOccluder();
+          else threeSceneRef.current?.clearFaceSlot(fi);
+
+          if (prefersReducedMotionRef.current) {
+            threeSceneRef.current?.setFaceSlotOpacity(fi, 0);
           } else {
-            threeSceneRef.current?.setModelOpacity(0);
+            const elapsed = now - facesLastSeenRef.current[fi];
+            if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformsRef.current[fi]) {
+              threeSceneRef.current?.applyFaceTransformMulti(
+                fi, smoothedTransformsRef.current[fi]!, canvas.width, canvas.height
+              );
+              const opacity = elapsed < FACE_HOLD_MS
+                ? 1
+                : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
+              threeSceneRef.current?.setFaceSlotOpacity(fi, opacity);
+            } else {
+              threeSceneRef.current?.setFaceSlotOpacity(fi, 0);
+            }
           }
         }
       }
@@ -750,14 +769,19 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
         )}
       </AnimatePresence>
 
-      {/* Multiple faces warning */}
+      {/* Multiple faces indicator */}
       {status === 'ready' && multipleFaces && (
         <div
           className="absolute top-4 left-1/2 -translate-x-1/2 z-10
-                        bg-amber-900/80 backdrop-blur-sm border border-amber-600/50
-                        rounded-full px-4 py-1.5 text-amber-300 text-xs font-medium"
+                        backdrop-blur-sm border px-4 py-1.5 text-xs font-medium font-sans"
+          style={{
+            backgroundColor: 'rgba(201,169,110,0.18)',
+            borderColor: 'rgba(201,169,110,0.4)',
+            color: '#C9A96E',
+            borderRadius: 2,
+          }}
         >
-          Multiple faces — tracking primary
+          Tracking multiple faces
         </div>
       )}
 
