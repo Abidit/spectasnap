@@ -20,6 +20,9 @@ export const LENS_TINT_OPTIONS: LensTint[] = [
   { label: 'Blue',   lensHex: '#001133', transmission: 0.4,  opacity: 0.6 },
   { label: 'Green',  lensHex: '#001100', transmission: 0.38, opacity: 0.62 },
   { label: 'Mirror', lensHex: '#8899aa', transmission: 0.1,  opacity: 0.85, metalness: 0.9, roughness: 0.05 },
+  { label: 'Photochromic', lensHex: '#e8e8ee', transmission: 0.92, opacity: 0.12 },
+  { label: 'Polarized',    lensHex: '#1a1a2e', transmission: 0.2,  opacity: 0.8 },
+  { label: 'Blue Light',   lensHex: '#fffde8', transmission: 0.88, opacity: 0.15 },
 ];
 
 export interface ColorVariant {
@@ -57,6 +60,13 @@ export interface ProceduralPreset {
   lensGap: number;
   browLift: number;
   colorVariants: ColorVariant[];
+  /** Total frame width in real-world millimeters (computed from lens geometry). */
+  frameWidthMm: number;
+}
+
+/** Compute total frame width in mm from Three.js unit dimensions. */
+function computeFrameWidthMm(lensWidth: number, lensGap: number, bridgeWidth: number): number {
+  return Math.round(((lensWidth * 2) + lensGap + bridgeWidth) / 0.065 * 130);
 }
 
 const SHAPES = [
@@ -187,6 +197,7 @@ function makePreset(
     lensGap,
     browLift,
     colorVariants: COLOR_VARIANTS,
+    frameWidthMm: computeFrameWidthMm(lensWidth, lensGap, bridgeWidth),
   };
 }
 
@@ -207,4 +218,13 @@ export const PROCEDURAL_PRESETS: ProceduralPreset[] = [
 
 export function getProceduralPreset(id: string): ProceduralPreset | undefined {
   return PROCEDURAL_PRESETS.find((preset) => preset.id === id);
+}
+
+/**
+ * Look up the total frame width (in mm) for a given frame ID.
+ * Returns `null` if the frame has no matching procedural preset (e.g. featured/GLB frames).
+ */
+export function getFrameWidthMm(frameId: string): number | null {
+  const preset = PROCEDURAL_PRESETS.find((p) => p.id === frameId);
+  return preset ? preset.frameWidthMm : null;
 }

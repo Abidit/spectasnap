@@ -6,14 +6,18 @@ import { useSearchParams } from 'next/navigation';
 import { GLASSES_COLLECTION, LENS_TINT_OPTIONS, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
 import { loadCustomFrame } from '@/ar/customFrameLoader';
 import { COLOR_VARIANTS } from '@/ar/presets';
+import type { PDMeasurement } from '@/ar/pdMeasure';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
 import ShareModal from '@/components/ShareModal';
+import CompareTray, { type SavedLook } from '@/components/CompareTray';
 import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import OfflineBanner from '@/components/OfflineBanner';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
+import type { RecordingState, RecordingResult } from '@/ar/recorder';
+import { ARRecorder } from '@/ar/recorder';
 
 const ARCamera = dynamic(() => import('@/components/ARCamera'), { ssr: false });
 const AIStylePanel = dynamic(() => import('@/components/AIStylePanel'), { ssr: false });
@@ -45,7 +49,35 @@ function TryDemo() {
   const [shareDataUrl, setShareDataUrl] = useState<string | null>(null);
   const [selectedTint, setSelectedTint] = useState<LensTint | null>(null);
   const [customFrames, setCustomFrames] = useState<GlassesFrame[]>([]);
+  const [pdMeasurement, setPDMeasurement] = useState<PDMeasurement | null>(null);
+  const [pdMeasuring, setPDMeasuring] = useState(false);
   const captureRef = useRef<(() => string | null) | null>(null);
+  const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [recordingResult, setRecordingResult] = useState<RecordingResult | null>(null);
+  const [shareMediaType, setShareMediaType] = useState<'image' | 'video'>('image');
+
+  function handleSaveLook() {
+    if (savedLooks.length >= 4) return;
+    const dataUrl = captureRef.current?.();
+    if (!dataUrl) return;
+    setSavedLooks((prev) => [
+      ...prev,
+      {
+        id: `look-${Date.now()}`,
+        dataUrl,
+        frameName: selected.name,
+        frameId: selected.id,
+        timestamp: Date.now(),
+      },
+    ]);
+    setToast({ message: `Look saved! (${savedLooks.length + 1}/4)`, type: 'success' });
+  }
+
+  function handleRemoveLook(id: string) {
+    setSavedLooks((prev) => prev.filter((l) => l.id !== id));
+  }
 
   // Load custom frame from localStorage when ?customFrame=true
   useEffect(() => {
@@ -106,6 +138,36 @@ function TryDemo() {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
+  const handlePDMeasured = useCallback((pd: PDMeasurement) => {
+    setPDMeasurement(pd);
+    if (pd.stable) {
+      setPDMeasuring(false);
+      setToast({ message: `PD measured: ${pd.pdMm} mm`, type: 'success' });
+    }
+  }, []);
+
+  const handleStartPDMeasure = useCallback(() => {
+    setPDMeasurement(null);
+    setPDMeasuring(true);
+  }, []);
+
+  const handleToggleRecording = useCallback(() => {
+    if (recording) {
+      setRecording(false);
+    } else {
+      setRecordingResult(null);
+      setRecording(true);
+    }
+  }, [recording]);
+
+  const handleRecordingComplete = useCallback((result: RecordingResult) => {
+    setRecording(false);
+    setRecordingResult(result);
+    setShareMediaType('video');
+    setShareDataUrl(result.url);
+    setShareOpen(true);
+  }, []);
+
   return (
     <div
       className="flex flex-col bg-brand-page"
@@ -124,9 +186,63 @@ function TryDemo() {
             onARStatusChange={setArStatus}
             onFaceShapeDetected={setFaceShape}
             captureRef={captureRef}
+            pdMeasuring={pdMeasuring}
+            onPDMeasured={handlePDMeasured}
+            pdMeasurement={pdMeasurement}
+            comparedFrames={savedLooks.map(l => l.frameId)}
+            recording={recording}
+            onRecordingStateChange={setRecordingState}
+            onRecordingComplete={handleRecordingComplete}
           />
 
           </ErrorBoundary>
+
+          {/* Record button */}
+          {ARRecorder.isSupported() && (
+            <button
+              onClick={handleToggleRecording}
+              className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-2 font-sans font-semibold text-xs tracking-wide transition-all"
+              style={{
+                borderRadius: 2,
+                backgroundColor: recording ? 'rgba(220,38,38,0.9)' : 'rgba(10,10,10,0.6)',
+                color: '#fff',
+                border: recording ? '1px solid rgba(220,38,38,1)' : '1px solid rgba(255,255,255,0.2)',
+              }}
+              aria-label={recording ? 'Stop recording' : 'Start recording'}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: recording ? 2 : '50%',
+                  backgroundColor: recording ? '#fff' : '#DC2626',
+                  display: 'inline-block',
+                }}
+              />
+              {recording ? `REC ${recordingState === 'recording' ? '' : '...'}` : 'Record'}
+            </button>
+          )}
+
+          {/* Compare Looks tray */}
+          <div className="absolute top-16 left-4 z-20">
+            <CompareTray
+              looks={savedLooks}
+              onRemove={handleRemoveLook}
+              onSelectFrame={(id) => {
+                const f =
+                  GLASSES_COLLECTION.find((g) => g.id === id) ||
+                  customFrames.find((g) => g.id === id);
+                if (f) handleSelect(f);
+              }}
+              onSave={handleSaveLook}
+              canSave={savedLooks.length < 4 && arStatus === 'tracking'}
+              onShareCollage={(collageUrl) => {
+                setShareMediaType('image');
+                setShareDataUrl(collageUrl);
+                setShareOpen(true);
+              }}
+            />
+          </div>
 
           <div
             className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
@@ -160,9 +276,13 @@ function TryDemo() {
                 if (f) handleSelect(f);
               }}
               onShareLook={() => {
+                setShareMediaType('image');
                 setShareDataUrl(captureRef.current?.() ?? null);
                 setShareOpen(true);
               }}
+              pdMeasurement={pdMeasurement}
+              pdMeasuring={pdMeasuring}
+              onMeasurePD={handleStartPDMeasure}
             />
           </div>
           {/* AI Stylist CTA — hidden until ANTHROPIC_API_KEY is configured */}
@@ -235,8 +355,10 @@ function TryDemo() {
         onClose={() => {
           setShareOpen(false);
           setShareDataUrl(null);
+          setShareMediaType('image');
         }}
         dataUrl={shareDataUrl}
+        mediaType={shareMediaType}
       />
 
       {/* Feedback toast — rendered at root so it composites above everything */}

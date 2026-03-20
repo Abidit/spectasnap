@@ -80,7 +80,7 @@ export function buildOccluderMesh(
   mesh.renderOrder = 0;
   mesh.visible = false;
   mesh.frustumCulled = false;
-  mesh.scale.setScalar(1.02); // Slight enlargement for full face coverage
+  mesh.scale.setScalar(1.01); // Slight enlargement for face coverage — 1.01 avoids nose-bridge clipping lenses
 
   scene.add(mesh);
 

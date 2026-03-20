@@ -34,6 +34,7 @@ import {
   updateTempleColor,
 } from './temples';
 import { createCustomFrameMesh, type CustomFrameData } from './customFrameLoader';
+import { calibrateGLB } from './glbCalibrate';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -311,6 +312,13 @@ async function loadGlassesModel(cfg: ModelConfig): Promise<THREE.Group> {
       modelPath,
       (gltf) => {
         const model = gltf.scene;
+
+        // Auto-calibrate GLB to match standard procedural glasses dimensions.
+        const calibration = calibrateGLB(model);
+        model.scale.setScalar(calibration.scale);
+        model.position.y += calibration.yOffset;
+        model.position.z += calibration.zOffset;
+
         setRenderOrderRecursive(model, 1);
         model.visible = false;
         state!.modelGroup.add(model);
@@ -645,6 +653,33 @@ export function setLensTint(tint: LensTint): void {
 }
 
 // ---------------------------------------------------------------------------
+// setLensCoating — toggle anti-reflective coating simulation (Task 8.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle anti-reflective coating simulation on lens materials.
+ * Uses Three.js iridescence properties (available in r149+).
+ */
+export function setLensCoating(enabled: boolean): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (!model) return;
+
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'lens') return;
+    const mat = obj.material as THREE.MeshPhysicalMaterial;
+    if (enabled) {
+      mat.iridescence = 0.5;
+      mat.iridescenceIOR = 1.3;
+      mat.iridescenceThicknessRange = [200, 400]; // green/purple nm range
+    } else {
+      mat.iridescence = 0;
+    }
+    mat.needsUpdate = true;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // registerCustomFrame — inject a user-uploaded frame into the registry
 // ---------------------------------------------------------------------------
 
@@ -666,6 +701,33 @@ export function registerCustomFrame(data: CustomFrameData): string {
   };
   state.registry.set(id, cfg);
   return id;
+}
+
+// ---------------------------------------------------------------------------
+// registerGLBModel — inject a store-uploaded GLB model into the registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Register a GLB model from a Blob URL so it can be loaded via selectModel().
+ * Optionally accepts calibration overrides for scale and position offsets.
+ */
+export function registerGLBModel(
+  id: string,
+  name: string,
+  blobUrl: string,
+  calibration?: { scale?: number; yOffset?: number; zOffset?: number },
+): void {
+  if (!state) return;
+  const cfg: ModelConfig = {
+    id,
+    name,
+    type: 'glb',
+    modelPath: blobUrl,
+    scaleMultiplier: calibration?.scale ?? 1.0,
+    offset: { x: 0, y: calibration?.yOffset ?? 0, z: calibration?.zOffset ?? 0 },
+    rotationOffset: { x: 0, y: 0, z: 0 },
+  };
+  state.registry.set(id, cfg);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,18 +5,26 @@ interface SessionPayload {
   faceShape?: string;
   framesTried?: string[];
   duration?: number;
+  pd?: number | null;
+  comparedFrames?: string[];
+  askStaffClicked?: boolean;
+  embedSource?: boolean;
 }
 
 export async function POST(req: Request): Promise<Response> {
   try {
     const body = (await req.json()) as SessionPayload;
-    const { store, faceShape, framesTried, duration } = body;
+    const { store, faceShape, framesTried, duration, pd, comparedFrames, askStaffClicked, embedSource } = body;
 
     const session = {
       store: store || 'default',
       faceShape: faceShape || null,
       framesTried: framesTried || [],
       duration: duration || 0,
+      pd: pd ?? null,
+      comparedFrames: comparedFrames || [],
+      askStaffClicked: askStaffClicked ?? false,
+      embedSource: embedSource ?? false,
       timestamp: Date.now(),
       date: new Date().toISOString().split('T')[0],
     };

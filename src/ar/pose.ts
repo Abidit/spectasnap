@@ -16,7 +16,7 @@ const LM_NOSE_TIP    = 1;    // tip of nose
 // ── Calibration constants ────────────────────────────────────────────────────
 
 /** Glasses centre shift above eye midpoint, as a fraction of IPD. */
-const Y_OFFSET_FACTOR = 0.20;
+const Y_OFFSET_FACTOR = 0.30;
 
 /**
  * Yaw: z-depth asymmetry of the outer eye corners → radians.

@@ -7,10 +7,15 @@ import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
 import { computeTransform, smoothKalman, createKalmanBank, computeFaceShape, type FaceTransform, type KalmanBank } from '@/ar/pose';
+import { createPDMeasurer, type PDMeasurement, type PDMeasurer } from '@/ar/pdMeasure';
+import { drawPDOverlay } from '@/ar/pdOverlay';
 import type { ColorVariant } from '@/lib/glasses-data';
 import type { LensTint } from '@/ar/presets';
 import { loadCustomFrame } from '@/ar/customFrameLoader';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
+import { createGlassesDetector, type GlassesDetector } from '@/ar/glassesDetector';
+import { inpaintGlasses } from '@/ar/inpaint';
+import { ARRecorder, type RecordingState, type RecordingResult } from '@/ar/recorder';
 
 type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'error';
 
@@ -29,6 +34,22 @@ interface ARCameraProps {
    * Used by ShareModal to capture the current look.
    */
   captureRef?: RefObject<(() => string | null) | null>;
+  /** When true, PD measurement runs each frame in the detection loop. */
+  pdMeasuring?: boolean;
+  /** Called with each PD measurement update while pdMeasuring is true. */
+  onPDMeasured?: (pd: PDMeasurement) => void;
+  /** Latest stable PD measurement — included in session analytics payload. */
+  pdMeasurement?: PDMeasurement | null;
+  /** Frame IDs saved to the compare tray — included in session analytics payload. */
+  comparedFrames?: string[];
+  /** Whether to detect and inpaint existing glasses before AR overlay. */
+  glassesRemoval?: boolean;
+  /** Whether recording is active. */
+  recording?: boolean;
+  /** Called whenever the recording state changes. */
+  onRecordingStateChange?: (state: RecordingState) => void;
+  /** Called when recording completes with the result blob/url. */
+  onRecordingComplete?: (result: RecordingResult) => void;
 }
 
 const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
@@ -54,7 +75,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export default function ARCamera({ selectedGlasses, selectedColor, selectedTint, onARStatusChange, onFaceShapeDetected, captureRef }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor, selectedTint, onARStatusChange, onFaceShapeDetected, captureRef, pdMeasuring, onPDMeasured, pdMeasurement, comparedFrames, glassesRemoval, recording, onRecordingStateChange, onRecordingComplete }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -67,6 +88,11 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
   const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
   const faceLastSeenRef = useRef<number>(-Infinity);
   const faceShapeDetectedRef = useRef(false);
+  const pdMeasurerRef = useRef<PDMeasurer | null>(null);
+  const pdMeasurementRef = useRef<PDMeasurement | null>(null);
+  const comparedFramesRef = useRef<string[]>([]);
+  const glassesDetectorRef = useRef<GlassesDetector | null>(null);
+  const recorderRef = useRef<ARRecorder | null>(null);
   const sessionRef = useRef<{
     store: string;
     faceShape: string | null;
@@ -74,11 +100,35 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     startTime: number;
   } | null>(null);
 
+  // Keep refs in sync with latest prop values (read at unmount without adding deps)
+  pdMeasurementRef.current = pdMeasurement ?? null;
+  comparedFramesRef.current = comparedFrames ?? [];
+
+  const prefersReducedMotionRef = useRef(false);
+
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [multipleFaces, setMultipleFaces] = useState(false);
   const [detectedFaceShape, setDetectedFaceShape] = useState<string | null>(null);
+  const [arAnnouncement, setArAnnouncement] = useState('');
+
+  // Detect prefers-reduced-motion once on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      prefersReducedMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+  }, []);
+
+  // Update screen reader announcement when AR status changes
+  useEffect(() => {
+    if (status === 'idle') setArAnnouncement('');
+    else if (status === 'requesting') setArAnnouncement('Starting camera');
+    else if (status === 'loading-mp') setArAnnouncement('Loading AR engine');
+    else if (status === 'error') setArAnnouncement('Camera error');
+    else if (status === 'ready' && faceDetected) setArAnnouncement('Face detected, AR tracking active');
+    else if (status === 'ready' && !faceDetected) setArAnnouncement('No face detected, position your face in the frame');
+  }, [status, faceDetected]);
 
   // Preload glasses image whenever selection changes
   useEffect(() => {
@@ -97,6 +147,10 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     smoothedTransformRef.current = null;
     kalmanBankRef.current = null;
     faceLastSeenRef.current = -Infinity;
+    pdMeasurerRef.current?.reset();
+    pdMeasurerRef.current = null;
+    glassesDetectorRef.current?.reset();
+    glassesDetectorRef.current = null;
   }, []);
 
   const renderLoop = useCallback(() => {
@@ -172,6 +226,17 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
           }
         }
 
+        // Inpaint existing glasses if removal is enabled and glasses are detected
+        if (glassesRemoval) {
+          if (!glassesDetectorRef.current) {
+            glassesDetectorRef.current = createGlassesDetector();
+          }
+          const wearing = glassesDetectorRef.current.detect(result.faceLandmarks[0]);
+          if (wearing) {
+            inpaintGlasses(ctx, result.faceLandmarks[0], canvas.width, canvas.height);
+          }
+        }
+
         const img = glassesImgRef.current;
         if (img) {
           drawGlassesOnCanvas(
@@ -203,6 +268,20 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
           canvas.height
         );
 
+        // ── PD measurement (when active) ──────────────────────────────────
+        if (pdMeasuring && onPDMeasured) {
+          if (!pdMeasurerRef.current) pdMeasurerRef.current = createPDMeasurer();
+          const pd = pdMeasurerRef.current.update(
+            result.faceLandmarks[0],
+            canvas.width,
+            canvas.height,
+          );
+          onPDMeasured(pd);
+
+          // Draw PD overlay on the 2D canvas (iris markers + dashed line + value)
+          drawPDOverlay(ctx, result.faceLandmarks[0], canvas.width, canvas.height, pd.pdMm);
+        }
+
         // Yaw fade: smoothly fade glasses past ~24°, fully gone by ~33° (just under YAW_MAX)
         const absYaw = Math.abs(smoothed.yaw);
         if (absYaw > 0.42) {
@@ -218,17 +297,22 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
         threeSceneRef.current?.clearTempleExtensions();
 
         // ── Stability: hold 500 ms, then fade over 300 ms ─────────────────
-        const elapsed = now - faceLastSeenRef.current;
-        if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformRef.current) {
-          threeSceneRef.current?.applyFaceTransform(
-            smoothedTransformRef.current,
-            canvas.width,
-            canvas.height
-          );
-          const opacity = elapsed < FACE_HOLD_MS ? 1 : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
-          threeSceneRef.current?.setModelOpacity(opacity);
-        } else {
+        // If user prefers reduced motion, skip the fade and hide immediately
+        if (prefersReducedMotionRef.current) {
           threeSceneRef.current?.setModelOpacity(0);
+        } else {
+          const elapsed = now - faceLastSeenRef.current;
+          if (elapsed < FACE_HOLD_MS + FACE_FADE_MS && smoothedTransformRef.current) {
+            threeSceneRef.current?.applyFaceTransform(
+              smoothedTransformRef.current,
+              canvas.width,
+              canvas.height
+            );
+            const opacity = elapsed < FACE_HOLD_MS ? 1 : 1 - (elapsed - FACE_HOLD_MS) / FACE_FADE_MS;
+            threeSceneRef.current?.setModelOpacity(opacity);
+          } else {
+            threeSceneRef.current?.setModelOpacity(0);
+          }
         }
       }
     } catch {
@@ -236,7 +320,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     }
 
     rafRef.current = requestAnimationFrame(renderLoop);
-  }, [selectedGlasses]);
+  }, [selectedGlasses, pdMeasuring, onPDMeasured, glassesRemoval]);
 
   const startCamera = useCallback(async () => {
     setStatus('requesting');
@@ -406,7 +490,12 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
       // POST final session on unmount
       if (sessionRef.current) {
         const duration = Math.round((Date.now() - sessionRef.current.startTime) / 1000);
-        const payload = { ...sessionRef.current, duration };
+        const payload = {
+          ...sessionRef.current,
+          duration,
+          pd: pdMeasurementRef.current?.stable ? pdMeasurementRef.current.pdMm : null,
+          comparedFrames: comparedFramesRef.current,
+        };
         fetch('/api/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -477,8 +566,45 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     }
   }, [detectedFaceShape, onFaceShapeDetected]);
 
+  // Handle recording prop changes — start/stop the ARRecorder
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    if (recording) {
+      if (!recorderRef.current) {
+        recorderRef.current = new ARRecorder({ maxDuration: 10, fps: 30 });
+      }
+      recorderRef.current.start(canvasRef.current, {
+        onStateChange: onRecordingStateChange,
+        onComplete: onRecordingComplete,
+      });
+    } else if (recorderRef.current?.getState() === 'recording') {
+      recorderRef.current.stop();
+    }
+  }, [recording]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-brand-camera overflow-hidden">
+    <div
+      className="relative w-full h-full flex items-center justify-center bg-brand-camera overflow-hidden"
+      aria-label="AR camera viewport with virtual glasses overlay"
+    >
+      {/* Visually hidden live region for screen reader status announcements */}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {arAnnouncement}
+      </span>
+
       {/* Hidden video element — actual rendering goes to canvas */}
       <video ref={videoRef} className="hidden" playsInline muted autoPlay />
 
@@ -670,6 +796,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
                        hover:border-brand-gold hover:text-brand-gold transition-colors"
             style={{ borderRadius: 2, minHeight: 44 }}
             title="Save look"
+            aria-label="Save current look as image"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Save Look</span>
@@ -687,6 +814,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
                        hover:border-[#25D366] hover:text-[#25D366] transition-colors"
             style={{ borderRadius: 2, minHeight: 44 }}
             title="Share on WhatsApp"
+            aria-label="Share on WhatsApp"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Share</span>
