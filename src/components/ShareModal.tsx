@@ -5,18 +5,20 @@ import { X, Download, MessageCircle } from 'lucide-react';
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Pre-captured JPEG dataUrl from ARCamera composite. Null means still capturing. */
+  /** Pre-captured JPEG dataUrl or video object URL from ARCamera composite. Null means still capturing. */
   dataUrl: string | null;
+  /** Type of media being shared. Defaults to 'image'. */
+  mediaType?: 'image' | 'video';
 }
 
-export default function ShareModal({ isOpen, onClose, dataUrl }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, dataUrl, mediaType = 'image' }: ShareModalProps) {
   if (!isOpen) return null;
 
   function handleDownload() {
     if (!dataUrl) return;
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = 'spectasnap-look.jpg';
+    a.download = mediaType === 'video' ? 'spectasnap-recording.webm' : 'spectasnap-look.jpg';
     a.click();
   }
 
@@ -74,15 +76,27 @@ export default function ShareModal({ isOpen, onClose, dataUrl }: ShareModalProps
           </h2>
         </div>
 
-        {/* Snapshot preview */}
+        {/* Media preview */}
         {dataUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={dataUrl}
-            alt="Your glasses look"
-            className="w-full border border-brand-border"
-            style={{ borderRadius: 2 }}
-          />
+          mediaType === 'video' ? (
+            <video
+              src={dataUrl}
+              controls
+              autoPlay
+              loop
+              muted
+              className="w-full border border-brand-border"
+              style={{ borderRadius: 2 }}
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={dataUrl}
+              alt="Your glasses look"
+              className="w-full border border-brand-border"
+              style={{ borderRadius: 2 }}
+            />
+          )
         ) : (
           <div
             className="w-full aspect-video bg-brand-secondary border border-brand-border

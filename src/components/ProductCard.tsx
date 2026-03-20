@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { Share2, Check } from 'lucide-react';
+import { Share2, Check, Sun, Moon } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
 import { computeSuitability, getTopRecommendations } from '@/lib/suitability';
 import type { PDMeasurement } from '@/ar/pdMeasure';
@@ -37,6 +37,14 @@ interface ProductCardProps {
   pdMeasuring?: boolean;
   /** Called when user taps "Measure PD" to start measuring. */
   onMeasurePD?: () => void;
+  /** Current photochromic mode (indoor/outdoor). Only relevant when Photochromic tint is active. */
+  photochromicMode?: 'indoor' | 'outdoor';
+  /** Called when user toggles photochromic Indoor/Outdoor mode. */
+  onPhotochromicModeChange?: (mode: 'indoor' | 'outdoor') => void;
+  /** Whether anti-reflective lens coating is enabled. */
+  lensCoating?: boolean;
+  /** Called when user toggles anti-reflective lens coating. */
+  onLensCoatingChange?: (enabled: boolean) => void;
 }
 
 const ALL_OCCASIONS = ['Casual', 'Office', 'Wedding', 'Sports'] as const;
@@ -61,6 +69,10 @@ export default function ProductCard({
   pdMeasurement,
   pdMeasuring,
   onMeasurePD,
+  photochromicMode,
+  onPhotochromicModeChange,
+  lensCoating,
+  onLensCoatingChange,
 }: ProductCardProps) {
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
 
@@ -96,7 +108,7 @@ export default function ProductCard({
         {/* Color swatches */}
         {colorVariants && colorVariants.length > 0 && (
           <div>
-            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
               Frame Color
             </p>
             <div className="flex flex-wrap gap-2">
@@ -119,7 +131,7 @@ export default function ProductCard({
                       flexShrink: 0,
                       transition: 'outline 0.12s',
                     }}
-                    aria-label={variant.label}
+                    aria-label={`${variant.label} frame color`}
                     aria-pressed={isActive}
                   />
                 );
@@ -133,7 +145,7 @@ export default function ProductCard({
           <>
             <div className="border-t border-brand-border" />
             <div>
-              <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+              <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
                 Lens Tint
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -150,6 +162,7 @@ export default function ProductCard({
                         backgroundColor: isActive ? 'rgba(201,169,110,0.12)' : '#FDFAF4',
                         color: isActive ? '#A8844A' : '#1A1612',
                       }}
+                      aria-label={`${tint.label} lens tint`}
                       aria-pressed={isActive}
                     >
                       {tint.label}
@@ -161,6 +174,81 @@ export default function ProductCard({
           </>
         )}
 
+        {/* Photochromic Indoor/Outdoor toggle (visible when Photochromic tint active) */}
+        {activeTint?.label === 'Photochromic' && (
+          <div>
+            <p
+              className="text-[9px] font-sans font-semibold tracking-[0.14em] uppercase mb-2"
+              style={{ color: '#C9A96E' }}
+              role="heading"
+              aria-level={3}
+            >
+              Light Condition
+            </p>
+            <div className="flex gap-2">
+              {([
+                { mode: 'indoor' as const, label: 'Indoor', Icon: Sun },
+                { mode: 'outdoor' as const, label: 'Outdoor', Icon: Moon },
+              ]).map(({ mode, label, Icon }) => {
+                const isActive = photochromicMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => onPhotochromicModeChange?.(mode)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-sans font-semibold uppercase tracking-[0.12em] border transition-colors duration-150"
+                    style={{
+                      borderRadius: 2,
+                      borderColor: isActive ? '#C9A96E' : '#DDD8CE',
+                      color: isActive ? '#C9A96E' : '#6B6560',
+                      backgroundColor: isActive ? 'rgba(201,169,110,0.08)' : 'transparent',
+                    }}
+                    aria-pressed={isActive}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Lens Coating */}
+        <div>
+          <p
+            className="text-[9px] font-sans font-semibold tracking-[0.14em] uppercase mb-2"
+            style={{ color: '#C9A96E' }}
+            role="heading"
+            aria-level={3}
+          >
+            Lens Coating
+          </p>
+          <div className="flex gap-2">
+            {([
+              { key: false, label: 'None' },
+              { key: true, label: 'Anti-Reflective' },
+            ] as const).map(({ key, label }) => {
+              const isActive = key === true ? !!lensCoating : !lensCoating;
+              return (
+                <button
+                  key={label}
+                  onClick={() => onLensCoatingChange?.(key)}
+                  className="px-3 py-1.5 text-[10px] font-sans font-semibold uppercase tracking-[0.12em] border transition-colors duration-150"
+                  style={{
+                    borderRadius: 2,
+                    borderColor: isActive ? '#C9A96E' : '#DDD8CE',
+                    color: isActive ? '#C9A96E' : '#6B6560',
+                    backgroundColor: isActive ? 'rgba(201,169,110,0.08)' : 'transparent',
+                  }}
+                  aria-pressed={isActive}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Divider */}
         <div className="border-t border-brand-border" />
 
@@ -170,9 +258,10 @@ export default function ProductCard({
             const suitability = computeSuitability(frame.style, faceShape);
             return (
               <div>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
                   Suitability Score
                 </p>
+                <div aria-live="polite" aria-atomic="true">
                 <div className="flex items-center gap-2.5 mb-2">
                   {/* Progress bar track */}
                   <div
@@ -230,12 +319,13 @@ export default function ProductCard({
                 <p className="text-[12px] font-sans italic text-brand-muted mt-1.5 leading-relaxed">
                   {suitability.reason}
                 </p>
+                </div>
               </div>
             );
           })()
         ) : (
           <div>
-            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
               Suitability Score
             </p>
             <p className="text-brand-muted text-xs font-sans italic leading-relaxed">
@@ -246,7 +336,7 @@ export default function ProductCard({
 
         {/* Best for */}
         <div>
-          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
             Best For
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -268,7 +358,7 @@ export default function ProductCard({
 
         {/* Occasion */}
         <div>
-          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
             Occasion
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -311,7 +401,7 @@ export default function ProductCard({
 
         {/* Recommended For You */}
         <div>
-          <p className="text-[10px] font-sans font-semibold tracking-[0.14em] uppercase mb-2" style={{ color: '#C9A96E' }}>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.14em] uppercase mb-2" style={{ color: '#C9A96E' }} role="heading" aria-level={3}>
             Recommended For You
           </p>
           {faceShape ? (
@@ -360,7 +450,7 @@ export default function ProductCard({
 
         {/* Staff note */}
         <div>
-          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
             Staff Note
           </p>
           <p className="text-brand-text text-sm font-sans leading-relaxed italic">
@@ -373,9 +463,10 @@ export default function ProductCard({
 
         {/* PD Measurement */}
         <div>
-          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
             Pupillary Distance
           </p>
+          <div aria-live="polite" aria-atomic="true">
           {pdMeasurement?.stable ? (
             <div className="flex items-center justify-between">
               <div
@@ -395,6 +486,7 @@ export default function ProductCard({
                 onClick={onMeasurePD}
                 className="text-[11px] font-sans font-medium underline underline-offset-2 transition-colors"
                 style={{ color: '#6B6560' }}
+                aria-label="Re-measure pupillary distance"
               >
                 Re-measure
               </button>
@@ -430,6 +522,7 @@ export default function ProductCard({
               Measure PD
             </button>
           )}
+          </div>
         </div>
 
         {/* Frame Fit Indicator — shown when PD is stable */}
@@ -456,8 +549,8 @@ export default function ProductCard({
           return (
             <>
               <div className="border-t border-brand-border" />
-              <div>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+              <div aria-live="polite" aria-atomic="true">
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2" role="heading" aria-level={3}>
                   Frame Fit
                 </p>
                 <p className="text-[11px] font-sans text-brand-muted mb-2.5">
@@ -519,6 +612,7 @@ export default function ProductCard({
                          bg-brand-text text-brand-page hover:opacity-90 transition-opacity
                          text-center inline-flex items-center justify-center"
               style={{ borderRadius: 2, minHeight: 44, textDecoration: 'none' }}
+              aria-label={contactLabel || `Ask staff about ${frame.name}`}
             >
               {contactLabel || 'Ask Staff for This Frame'}
             </a>
@@ -529,6 +623,7 @@ export default function ProductCard({
                          bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
                          transition-all duration-150"
               style={{ borderRadius: 2 }}
+              aria-label={`Ask staff about ${frame.name}`}
             >
               Ask Staff for This Frame
             </button>
@@ -539,6 +634,7 @@ export default function ProductCard({
                        tracking-wide border border-brand-border text-brand-text
                        hover:border-brand-text transition-colors duration-150"
             style={{ borderRadius: 2 }}
+            aria-label={`Share your look with ${frame.name}`}
           >
             <Share2 className="w-3.5 h-3.5" />
             Share My Look

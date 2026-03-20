@@ -68,6 +68,10 @@ function createLensMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMateria
     envMapIntensity: cfg.envMapIntensity,
     side: THREE.DoubleSide,
     depthWrite: false,
+    // AR coating support (Task 8.2) — initialized off, toggled by setLensCoating()
+    iridescence: 0,
+    iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [200, 400],
   });
 }
 

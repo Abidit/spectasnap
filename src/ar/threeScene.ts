@@ -653,6 +653,33 @@ export function setLensTint(tint: LensTint): void {
 }
 
 // ---------------------------------------------------------------------------
+// setLensCoating — toggle anti-reflective coating simulation (Task 8.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle anti-reflective coating simulation on lens materials.
+ * Uses Three.js iridescence properties (available in r149+).
+ */
+export function setLensCoating(enabled: boolean): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (!model) return;
+
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'lens') return;
+    const mat = obj.material as THREE.MeshPhysicalMaterial;
+    if (enabled) {
+      mat.iridescence = 0.5;
+      mat.iridescenceIOR = 1.3;
+      mat.iridescenceThicknessRange = [200, 400]; // green/purple nm range
+    } else {
+      mat.iridescence = 0;
+    }
+    mat.needsUpdate = true;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // registerCustomFrame — inject a user-uploaded frame into the registry
 // ---------------------------------------------------------------------------
 

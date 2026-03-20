@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera } from 'lucide-react';
+import { X, Camera, Share2 } from 'lucide-react';
+import { generateCompareCollage } from './CompareExport';
 
 export interface SavedLook {
   id: string;
@@ -18,6 +19,8 @@ interface CompareTrayProps {
   onSelectFrame: (frameId: string) => void;
   onSave: () => void;
   canSave: boolean;
+  /** Called with a JPEG dataUrl of the 2x2 collage when the user taps "Share Compare". */
+  onShareCollage?: (dataUrl: string) => void;
 }
 
 const MAX_LOOKS = 4;
@@ -28,9 +31,13 @@ export default function CompareTray({
   onSelectFrame,
   onSave,
   canSave,
+  onShareCollage,
 }: CompareTrayProps) {
   const [expanded, setExpanded] = useState(false);
   const [activeThumbId, setActiveThumbId] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const handleThumbTap = useCallback(
     (look: SavedLook) => {
@@ -46,10 +53,64 @@ export default function CompareTray({
     if (looks.length > 0) setExpanded(true);
   }, [looks.length]);
 
+  const handleShareCollage = useCallback(() => {
+    const collage = generateCompareCollage(looks);
+    if (collage && onShareCollage) onShareCollage(collage);
+  }, [looks, onShareCollage]);
+
+  // Focus management: save trigger element on open, restore on close
+  useEffect(() => {
+    if (expanded) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+      // Focus first look card when overlay opens
+      requestAnimationFrame(() => {
+        const firstCard = gridRef.current?.querySelector<HTMLButtonElement>('button[data-look]');
+        firstCard?.focus();
+      });
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [expanded]);
+
+  // Keyboard handler for the expanded overlay
+  const handleOverlayKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setExpanded(false);
+        return;
+      }
+
+      // Arrow key navigation between look cards
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+
+      const grid = gridRef.current;
+      if (!grid) return;
+      const cards = Array.from(grid.querySelectorAll<HTMLButtonElement>('button[data-look]'));
+      if (cards.length === 0) return;
+
+      const current = document.activeElement as HTMLElement;
+      const idx = cards.indexOf(current as HTMLButtonElement);
+      let nextIdx: number;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIdx = idx < cards.length - 1 ? idx + 1 : 0;
+      } else {
+        nextIdx = idx > 0 ? idx - 1 : cards.length - 1;
+      }
+
+      cards[nextIdx]?.focus();
+    },
+    [],
+  );
+
   return (
     <>
       {/* ── Inline tray ────────────────────────────────────────────────── */}
       <div
+        ref={triggerRef}
         className="flex items-center gap-2"
         onDoubleClick={handleDoubleClick}
       >
@@ -195,6 +256,10 @@ export default function CompareTray({
               WebkitBackdropFilter: 'blur(14px)',
             }}
             onClick={() => setExpanded(false)}
+            onKeyDown={handleOverlayKeyDown}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Compare saved looks"
           >
             {/* Grid card */}
             <motion.div
@@ -247,6 +312,7 @@ export default function CompareTray({
 
               {/* 2x2 grid */}
               <div
+                ref={gridRef}
                 className="grid gap-3"
                 style={{
                   gridTemplateColumns:
@@ -256,11 +322,12 @@ export default function CompareTray({
                 {looks.map((look) => (
                   <button
                     key={look.id}
+                    data-look={look.id}
                     onClick={() => {
                       onSelectFrame(look.frameId);
                       setExpanded(false);
                     }}
-                    className="relative group overflow-hidden"
+                    className="relative group overflow-hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-gold"
                     style={{
                       borderRadius: 2,
                       border: '1px solid rgba(255,255,255,0.12)',
@@ -268,6 +335,7 @@ export default function CompareTray({
                       padding: 0,
                       cursor: 'pointer',
                     }}
+                    aria-label={`Select look with ${look.frameName}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -326,6 +394,26 @@ export default function CompareTray({
                   </div>
                 ))}
               </div>
+
+              {/* Share Compare button — visible when at least 2 looks are saved */}
+              {looks.length >= 2 && onShareCollage && (
+                <button
+                  onClick={handleShareCollage}
+                  className="w-full flex items-center justify-center gap-2 py-2.5
+                             font-sans font-semibold text-xs tracking-wide transition-colors"
+                  style={{
+                    borderRadius: 2,
+                    border: '1px solid #C9A96E',
+                    color: '#C9A96E',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Share comparison as collage image"
+                >
+                  <Share2 style={{ width: 14, height: 14 }} />
+                  Share Compare
+                </button>
+              )}
             </motion.div>
           </motion.div>
         )}

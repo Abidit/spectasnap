@@ -16,6 +16,8 @@ import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import OfflineBanner from '@/components/OfflineBanner';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
+import type { RecordingState, RecordingResult } from '@/ar/recorder';
+import { ARRecorder } from '@/ar/recorder';
 
 const ARCamera = dynamic(() => import('@/components/ARCamera'), { ssr: false });
 const AIStylePanel = dynamic(() => import('@/components/AIStylePanel'), { ssr: false });
@@ -51,6 +53,10 @@ function TryDemo() {
   const [pdMeasuring, setPDMeasuring] = useState(false);
   const captureRef = useRef<(() => string | null) | null>(null);
   const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [recordingResult, setRecordingResult] = useState<RecordingResult | null>(null);
+  const [shareMediaType, setShareMediaType] = useState<'image' | 'video'>('image');
 
   function handleSaveLook() {
     if (savedLooks.length >= 4) return;
@@ -145,6 +151,23 @@ function TryDemo() {
     setPDMeasuring(true);
   }, []);
 
+  const handleToggleRecording = useCallback(() => {
+    if (recording) {
+      setRecording(false);
+    } else {
+      setRecordingResult(null);
+      setRecording(true);
+    }
+  }, [recording]);
+
+  const handleRecordingComplete = useCallback((result: RecordingResult) => {
+    setRecording(false);
+    setRecordingResult(result);
+    setShareMediaType('video');
+    setShareDataUrl(result.url);
+    setShareOpen(true);
+  }, []);
+
   return (
     <div
       className="flex flex-col bg-brand-page"
@@ -167,9 +190,38 @@ function TryDemo() {
             onPDMeasured={handlePDMeasured}
             pdMeasurement={pdMeasurement}
             comparedFrames={savedLooks.map(l => l.frameId)}
+            recording={recording}
+            onRecordingStateChange={setRecordingState}
+            onRecordingComplete={handleRecordingComplete}
           />
 
           </ErrorBoundary>
+
+          {/* Record button */}
+          {ARRecorder.isSupported() && (
+            <button
+              onClick={handleToggleRecording}
+              className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-2 font-sans font-semibold text-xs tracking-wide transition-all"
+              style={{
+                borderRadius: 2,
+                backgroundColor: recording ? 'rgba(220,38,38,0.9)' : 'rgba(10,10,10,0.6)',
+                color: '#fff',
+                border: recording ? '1px solid rgba(220,38,38,1)' : '1px solid rgba(255,255,255,0.2)',
+              }}
+              aria-label={recording ? 'Stop recording' : 'Start recording'}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: recording ? 2 : '50%',
+                  backgroundColor: recording ? '#fff' : '#DC2626',
+                  display: 'inline-block',
+                }}
+              />
+              {recording ? `REC ${recordingState === 'recording' ? '' : '...'}` : 'Record'}
+            </button>
+          )}
 
           {/* Compare Looks tray */}
           <div className="absolute top-16 left-4 z-20">
@@ -184,6 +236,11 @@ function TryDemo() {
               }}
               onSave={handleSaveLook}
               canSave={savedLooks.length < 4 && arStatus === 'tracking'}
+              onShareCollage={(collageUrl) => {
+                setShareMediaType('image');
+                setShareDataUrl(collageUrl);
+                setShareOpen(true);
+              }}
             />
           </div>
 
@@ -219,6 +276,7 @@ function TryDemo() {
                 if (f) handleSelect(f);
               }}
               onShareLook={() => {
+                setShareMediaType('image');
                 setShareDataUrl(captureRef.current?.() ?? null);
                 setShareOpen(true);
               }}
@@ -297,8 +355,10 @@ function TryDemo() {
         onClose={() => {
           setShareOpen(false);
           setShareDataUrl(null);
+          setShareMediaType('image');
         }}
         dataUrl={shareDataUrl}
+        mediaType={shareMediaType}
       />
 
       {/* Feedback toast — rendered at root so it composites above everything */}

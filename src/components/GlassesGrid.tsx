@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
@@ -32,6 +32,7 @@ interface GlassesGridProps {
 
 export default function GlassesGrid({ selected, onSelect, extraFrames }: GlassesGridProps) {
   const [activeFilter, setActiveFilter] = useState<FilterFamily>('all');
+  const frameContainerRef = useRef<HTMLDivElement>(null);
 
   // Merge extra frames (custom uploads) with the built-in collection.
   const collection = useMemo(
@@ -64,6 +65,45 @@ export default function GlassesGrid({ selected, onSelect, extraFrames }: Glasses
   const visibleFilters = useMemo(
     () => FILTERS.filter((f) => f.key === 'all' || counts[f.key] > 0),
     [counts],
+  );
+
+  // Derive announcement text from selected frame (no effect needed)
+  const announcedFrame = `Selected ${selected.name}, ${selected.style}`;
+
+  // Keyboard navigation for frame cards (roving tabindex pattern)
+  const handleFrameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      let nextIndex: number | null = null;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        nextIndex = index < filtered.length - 1 ? index + 1 : 0;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        nextIndex = index > 0 ? index - 1 : filtered.length - 1;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        nextIndex = filtered.length - 1;
+      }
+
+      if (nextIndex !== null) {
+        onSelect(filtered[nextIndex]);
+        // Focus the newly selected card and scroll it into view
+        const container = frameContainerRef.current;
+        if (container) {
+          const buttons = container.querySelectorAll<HTMLButtonElement>('[role="option"]');
+          const target = buttons[nextIndex];
+          if (target) {
+            target.focus();
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        }
+      }
+    },
+    [filtered, onSelect],
   );
 
   return (
@@ -131,17 +171,28 @@ export default function GlassesGrid({ selected, onSelect, extraFrames }: Glasses
       </div>
 
       {/* ── Horizontal scroll row ───────────────────────────────────────── */}
-      <div className="flex gap-2.5 overflow-x-auto pb-0.5 scrollbar-hide snap-x snap-mandatory">
-        {filtered.map((frame) => {
+      <div
+        ref={frameContainerRef}
+        role="listbox"
+        aria-label="Available frames"
+        className="flex gap-2.5 overflow-x-auto pb-0.5 scrollbar-hide snap-x snap-mandatory"
+      >
+        {filtered.map((frame, index) => {
           const isSelected = frame.id === selected.id;
           return (
             <motion.button
               key={frame.id}
+              role="option"
+              aria-selected={isSelected}
+              aria-label={`Select ${frame.name}, ${frame.style}`}
+              tabIndex={isSelected ? 0 : -1}
               onClick={() => onSelect(frame)}
+              onKeyDown={(e) => handleFrameKeyDown(e, index)}
               whileTap={{ scale: 0.96 }}
               className={clsx(
                 'relative flex-shrink-0 snap-center flex flex-col items-center gap-1.5 px-3 pt-3 pb-2.5',
                 'border transition-all duration-200 cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-gold',
                 isSelected
                   ? 'border-brand-gold bg-white/10'
                   : 'border-white/15 bg-white/6 hover:border-white/30',
@@ -190,6 +241,23 @@ export default function GlassesGrid({ selected, onSelect, extraFrames }: Glasses
           );
         })}
       </div>
+
+      {/* Hidden live region for screen reader announcements */}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {announcedFrame}
+      </span>
     </div>
   );
 }

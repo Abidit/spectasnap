@@ -20,6 +20,9 @@ export const LENS_TINT_OPTIONS: LensTint[] = [
   { label: 'Blue',   lensHex: '#001133', transmission: 0.4,  opacity: 0.6 },
   { label: 'Green',  lensHex: '#001100', transmission: 0.38, opacity: 0.62 },
   { label: 'Mirror', lensHex: '#8899aa', transmission: 0.1,  opacity: 0.85, metalness: 0.9, roughness: 0.05 },
+  { label: 'Photochromic', lensHex: '#e8e8ee', transmission: 0.92, opacity: 0.12 },
+  { label: 'Polarized',    lensHex: '#1a1a2e', transmission: 0.2,  opacity: 0.8 },
+  { label: 'Blue Light',   lensHex: '#fffde8', transmission: 0.88, opacity: 0.15 },
 ];
 
 export interface ColorVariant {
