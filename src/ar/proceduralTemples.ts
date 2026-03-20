@@ -81,25 +81,34 @@ function createTempleMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMater
 /**
  * Build the 5-point CatmullRom spine for a temple arm on the given side.
  *
- * Control points (for 'left' side, +X outward, -Z backward from face):
+ * Control points (for 'left' side, -X outward, +Z backward from face):
  *   0. Hinge        (0, 0, 0)
- *   1. Straight run  at ~40% length — extends backward (-Z)
+ *   1. Straight run  at ~40% length — extends backward (+Z local → -Z world)
  *   2. Slight droop  at ~70% length — small Y decrease begins
  *   3. Ear curve     at ~95% length — bends downward toward the ear
  *   4. Tip           at 100% length — ear hook endpoint
  *
  * For 'right' side the X coordinates are mirrored (negated).
+ *
+ * NOTE: +Z local is used because MODEL_BASE_ROTATION_Y = π in threeScene.ts
+ * flips Z. After rotation, +Z local → -Z world = behind the head.
  */
 function buildTempleCurve(
   templeLength: number,
   side: 'left' | 'right',
 ): THREE.CatmullRomCurve3 {
-  // Sign multiplier: left arm extends in +X, right in -X.
-  const sx = side === 'left' ? 1 : -1;
+  // Sign multiplier: left arm extends in -X (local), right in +X (local).
+  // After MODEL_BASE_ROTATION_Y = PI in threeScene.ts, local -X → world +X
+  // (viewer's left), so the temples spread outward from the hinges correctly.
+  const sx = side === 'left' ? -1 : 1;
 
   // Small lateral offset so the arm angles slightly outward from the hinge.
   const lateralSpread = templeLength * 0.12;
 
+  // Temples extend in +Z locally. After MODEL_BASE_ROTATION_Y = PI,
+  // local +Z → world -Z (behind the head, toward the ears). This is the
+  // correct direction for temple arms to be hidden by the face occluder
+  // and appear to wrap around the head.
   const points: THREE.Vector3[] = [
     // 0 - Hinge point (origin)
     new THREE.Vector3(0, 0, 0),
@@ -108,28 +117,28 @@ function buildTempleCurve(
     new THREE.Vector3(
       sx * lateralSpread * 0.4,
       0,
-      -templeLength * 0.4,
+      templeLength * 0.4,
     ),
 
     // 2 - Slight droop at 70% of length
     new THREE.Vector3(
       sx * lateralSpread * 0.7,
       -templeLength * 0.015,
-      -templeLength * 0.7,
+      templeLength * 0.7,
     ),
 
     // 3 - Ear curve at 95% of length — starts bending downward
     new THREE.Vector3(
       sx * lateralSpread * 0.9,
       -templeLength * 0.06,
-      -templeLength * 0.95,
+      templeLength * 0.95,
     ),
 
     // 4 - Tip — ear hook endpoint
     new THREE.Vector3(
       sx * lateralSpread * 0.85,
       -templeLength * 0.14,
-      -templeLength,
+      templeLength,
     ),
   ];
 

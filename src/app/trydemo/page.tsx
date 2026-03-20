@@ -57,6 +57,7 @@ function TryDemo() {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingResult, setRecordingResult] = useState<RecordingResult | null>(null);
   const [shareMediaType, setShareMediaType] = useState<'image' | 'video'>('image');
+  const [isRecordingSupported, setIsRecordingSupported] = useState(false);
 
   function handleSaveLook() {
     if (savedLooks.length >= 4) return;
@@ -80,6 +81,10 @@ function TryDemo() {
   }
 
   // Load custom frame from localStorage when ?customFrame=true
+  useEffect(() => {
+    setIsRecordingSupported(ARRecorder.isSupported());
+  }, []);
+
   useEffect(() => {
     if (searchParams.get('customFrame') !== 'true') return;
     const data = loadCustomFrame();
@@ -198,7 +203,7 @@ function TryDemo() {
           </ErrorBoundary>
 
           {/* Record button */}
-          {ARRecorder.isSupported() && (
+          {isRecordingSupported && (
             <button
               onClick={handleToggleRecording}
               className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-2 font-sans font-semibold text-xs tracking-wide transition-all"
