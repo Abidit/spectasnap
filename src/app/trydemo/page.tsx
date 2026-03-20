@@ -44,6 +44,7 @@ function TryDemo() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareDataUrl, setShareDataUrl] = useState<string | null>(null);
   const [selectedTint, setSelectedTint] = useState<LensTint | null>(null);
+  const [customFrames, setCustomFrames] = useState<GlassesFrame[]>([]);
   const captureRef = useRef<(() => string | null) | null>(null);
 
   // Load custom frame from localStorage when ?customFrame=true
@@ -69,6 +70,7 @@ function TryDemo() {
       colorVariants: COLOR_VARIANTS,
     };
 
+    setCustomFrames([customFrame]);
     setSelected(customFrame);
     setToast({
       message: `Custom frame "${data.name || 'Custom Frame'}" loaded!`,
@@ -133,7 +135,7 @@ function TryDemo() {
               background: 'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0) 100%)',
             }}
           >
-            <GlassesGrid selected={selected} onSelect={handleSelect} />
+            <GlassesGrid selected={selected} onSelect={handleSelect} extraFrames={customFrames} />
           </div>
         </div>
 

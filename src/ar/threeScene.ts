@@ -672,6 +672,11 @@ export function registerCustomFrame(data: CustomFrameData): string {
 // Accessors — for future agents (face-pose, occlusion, etc.)
 // ---------------------------------------------------------------------------
 
+/** Returns true once initThreeOverlay() has completed (state is non-null). */
+export function isReady(): boolean {
+  return state !== null;
+}
+
 export function getActiveModel(): THREE.Group | null {
   if (!state?.activeId) return null;
   return state.cache.get(state.activeId) ?? null;
