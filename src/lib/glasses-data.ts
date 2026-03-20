@@ -1,6 +1,7 @@
-import { PROCEDURAL_PRESETS, COLOR_VARIANTS, type FrameFamily, type ColorVariant } from '@/ar/presets';
+import { PROCEDURAL_PRESETS, COLOR_VARIANTS, LENS_TINT_OPTIONS, type FrameFamily, type ColorVariant, type LensTint } from '@/ar/presets';
 
-export type { ColorVariant };
+export type { ColorVariant, LensTint };
+export { LENS_TINT_OPTIONS };
 
 export interface GlassesFrame {
   id: string;

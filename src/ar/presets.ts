@@ -1,5 +1,27 @@
 export type FrameFamily = 'round' | 'rectangle' | 'aviator' | 'cat-eye' | 'sport-wrap';
 
+// ---------------------------------------------------------------------------
+// Lens tint variants (Task 9 — applies to all frames)
+// ---------------------------------------------------------------------------
+
+export interface LensTint {
+  label: string;
+  lensHex: string;
+  transmission: number;
+  opacity: number;
+  metalness?: number;
+  roughness?: number;
+}
+
+export const LENS_TINT_OPTIONS: LensTint[] = [
+  { label: 'Clear',  lensHex: '#ffffff', transmission: 0.95, opacity: 0.08 },
+  { label: 'Smoke',  lensHex: '#111111', transmission: 0.3,  opacity: 0.7 },
+  { label: 'Brown',  lensHex: '#3d1f00', transmission: 0.35, opacity: 0.65 },
+  { label: 'Blue',   lensHex: '#001133', transmission: 0.4,  opacity: 0.6 },
+  { label: 'Green',  lensHex: '#001100', transmission: 0.38, opacity: 0.62 },
+  { label: 'Mirror', lensHex: '#8899aa', transmission: 0.1,  opacity: 0.85, metalness: 0.9, roughness: 0.05 },
+];
+
 export interface ColorVariant {
   label: string;
   frameHex: string;

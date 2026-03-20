@@ -1,6 +1,106 @@
 import * as THREE from 'three';
 import type { ProceduralPreset } from './presets';
 
+// ---------------------------------------------------------------------------
+// Lens material presets — per-style variant (Task 1)
+// ---------------------------------------------------------------------------
+
+interface LensMaterialConfig {
+  color: number;
+  metalness: number;
+  roughness: number;
+  transmission: number;
+  thickness: number;
+  ior: number;
+  opacity: number;
+  envMapIntensity: number;
+}
+
+const LENS_PRESETS: Record<string, LensMaterialConfig> = {
+  default: {
+    color: 0x88aacc, metalness: 0.0, roughness: 0.05,
+    transmission: 0.92, thickness: 0.5, ior: 1.5,
+    opacity: 0.18, envMapIntensity: 1.2,
+  },
+  dark: {
+    color: 0x111111, metalness: 0.0, roughness: 0.08,
+    transmission: 0.35, thickness: 0.5, ior: 1.5,
+    opacity: 0.65, envMapIntensity: 1.2,
+  },
+  gold: {
+    color: 0xc9a96e, metalness: 0.3, roughness: 0.05,
+    transmission: 0.45, thickness: 0.5, ior: 1.5,
+    opacity: 0.55, envMapIntensity: 1.2,
+  },
+  clear: {
+    color: 0xccddee, metalness: 0.0, roughness: 0.02,
+    transmission: 0.96, thickness: 0.5, ior: 1.5,
+    opacity: 0.08, envMapIntensity: 1.2,
+  },
+  rose: {
+    color: 0xc4826a, metalness: 0.0, roughness: 0.06,
+    transmission: 0.5, thickness: 0.5, ior: 1.5,
+    opacity: 0.5, envMapIntensity: 1.2,
+  },
+};
+
+/** Resolve which lens material preset to use based on frame family/color. */
+function resolveLensKey(preset: ProceduralPreset): string {
+  if (preset.family === 'aviator') return 'gold';
+  if (preset.family === 'cat-eye') return 'rose';
+  if (preset.frameColor === '#c8c8c8') return 'clear';
+  if (preset.frameColor === '#1b1b1d' || preset.frameColor === '#6a4d3c') return 'dark';
+  return 'default';
+}
+
+function createLensMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMaterial {
+  const key = resolveLensKey(preset);
+  const cfg = LENS_PRESETS[key] ?? LENS_PRESETS.default;
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(cfg.color),
+    metalness: cfg.metalness,
+    roughness: cfg.roughness,
+    transmission: cfg.transmission,
+    thickness: cfg.thickness,
+    ior: cfg.ior,
+    transparent: true,
+    opacity: cfg.opacity,
+    envMapIntensity: cfg.envMapIntensity,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Frame material — acetate vs metal (Task 3)
+// ---------------------------------------------------------------------------
+
+function createFrameMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMaterial {
+  const isMetal = preset.family === 'aviator' || preset.family === 'sport-wrap';
+  if (isMetal) {
+    return new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(preset.frameColor),
+      metalness: 0.95,
+      roughness: 0.15,
+      reflectivity: 1.0,
+      envMapIntensity: 1.4,
+    });
+  }
+  // Acetate: round, rectangle, cat-eye
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(preset.frameColor),
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1,
+    roughness: 0.35,
+    metalness: 0.05,
+    envMapIntensity: 0.8,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Shape generators (unchanged)
+// ---------------------------------------------------------------------------
+
 function makeLensShape(preset: ProceduralPreset): THREE.Shape {
   const w = preset.lensWidth;
   const h = preset.lensHeight;
@@ -44,6 +144,10 @@ function makeLensShape(preset: ProceduralPreset): THREE.Shape {
   return shape;
 }
 
+// ---------------------------------------------------------------------------
+// Rim extrude geometry — refined bevel (Task 3)
+// ---------------------------------------------------------------------------
+
 function buildRimGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
   const outer = makeLensShape(preset);
   const inner = makeLensShape({
@@ -55,49 +159,44 @@ function buildRimGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
   outer.holes.push(inner);
 
   return new THREE.ExtrudeGeometry(outer, {
-    depth: preset.frameDepth,
+    depth: 0.007,
     bevelEnabled: true,
-    bevelSize: 0.001,
-    bevelThickness: 0.001,
-    bevelSegments: 2,
-    curveSegments: 32,
+    bevelSize: 0.0015,
+    bevelThickness: 0.0025,
+    bevelSegments: 4,
+    curveSegments: 24,
     steps: 1,
   });
 }
 
+// ---------------------------------------------------------------------------
+// createProceduralGlasses — main factory
+// ---------------------------------------------------------------------------
+
 export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   const group = new THREE.Group();
 
-  const frameMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(preset.frameColor),
-    metalness: preset.family === 'aviator' ? 0.6 : 0.25,
-    roughness: preset.family === 'aviator' ? 0.3 : 0.48,
-  });
+  // ── Materials ──────────────────────────────────────────────────────────────
+  const frameMat = createFrameMaterial(preset);
+  const lensMat = createLensMaterial(preset);
 
-  const lensMat = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(preset.lensTint),
-    transparent: true,
-    opacity: 0.42,
-    transmission: 0.85,
-    roughness: 0.08,
-    thickness: 0.005,
-    metalness: 0.0,
-    ior: 1.5,
-    envMapIntensity: 1.2,
-  });
-
+  // ── Geometry ───────────────────────────────────────────────────────────────
   const rimGeo = buildRimGeometry(preset);
   const halfIPD = preset.lensWidth + preset.lensGap;
-  const lensZ = preset.frameDepth * 0.2;
+  const lensZ = 0.007 * 0.2; // depth * 0.2
 
+  // ── Rims ───────────────────────────────────────────────────────────────────
   const leftRim = new THREE.Mesh(rimGeo, frameMat);
-  leftRim.position.set(-halfIPD, 0, -preset.frameDepth * 0.5);
+  leftRim.position.set(-halfIPD, 0, -0.007 * 0.5);
+  leftRim.userData.role = 'frame';
   group.add(leftRim);
 
   const rightRim = new THREE.Mesh(rimGeo, frameMat);
-  rightRim.position.set(halfIPD, 0, -preset.frameDepth * 0.5);
+  rightRim.position.set(halfIPD, 0, -0.007 * 0.5);
+  rightRim.userData.role = 'frame';
   group.add(rightRim);
 
+  // ── Lenses ─────────────────────────────────────────────────────────────────
   const lensShape = makeLensShape({
     ...preset,
     lensWidth: Math.max(0.01, preset.lensWidth - preset.rimThickness * 1.1),
@@ -107,39 +206,78 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
 
   const leftLens = new THREE.Mesh(lensGeo, lensMat);
   leftLens.position.set(-halfIPD, 0, lensZ);
+  leftLens.userData.role = 'lens';
   group.add(leftLens);
 
   const rightLens = new THREE.Mesh(lensGeo, lensMat);
   rightLens.position.set(halfIPD, 0, lensZ);
+  rightLens.userData.role = 'lens';
   group.add(rightLens);
 
-  // Dark tint overlay — rgba(0,0,0,0.22) per design spec
-  const darkTintMat = new THREE.MeshBasicMaterial({
-    color: 0x000000,
+  // ── Lens glare highlights (Task 6) ─────────────────────────────────────────
+  const glareShape = new THREE.Shape();
+  glareShape.moveTo(-0.018, 0.012);
+  glareShape.quadraticCurveTo(-0.008, 0.022, 0.005, 0.018);
+  glareShape.quadraticCurveTo(0.002, 0.008, -0.018, 0.012);
+
+  const glareGeo = new THREE.ShapeGeometry(glareShape);
+  const glareMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     transparent: true,
     opacity: 0.22,
     depthWrite: false,
+    blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
   });
-  const leftTint = new THREE.Mesh(lensGeo, darkTintMat);
-  leftTint.position.set(-halfIPD, 0, lensZ + 0.0005);
-  group.add(leftTint);
-  const rightTint = new THREE.Mesh(lensGeo, darkTintMat);
-  rightTint.position.set(halfIPD, 0, lensZ + 0.0005);
-  group.add(rightTint);
 
-  const bridgeGeo = new THREE.BoxGeometry(preset.bridgeWidth, preset.rimThickness * 0.9, preset.frameDepth * 0.9);
+  const leftGlare = new THREE.Mesh(glareGeo, glareMat);
+  leftGlare.position.set(-halfIPD, preset.lensHeight * 0.15, lensZ + 0.001);
+  leftGlare.userData.role = 'glare';
+  group.add(leftGlare);
+
+  const rightGlare = new THREE.Mesh(glareGeo, glareMat);
+  rightGlare.position.set(halfIPD, preset.lensHeight * 0.15, lensZ + 0.001);
+  rightGlare.scale.x = -1; // Mirror for right lens
+  rightGlare.userData.role = 'glare';
+  group.add(rightGlare);
+
+  // ── Bridge ─────────────────────────────────────────────────────────────────
+  const bridgeGeo = new THREE.BoxGeometry(
+    preset.bridgeWidth,
+    preset.rimThickness * 0.9,
+    0.007 * 0.9,
+  );
   const bridge = new THREE.Mesh(bridgeGeo, frameMat);
-  bridge.position.set(0, preset.lensHeight * 0.14, -preset.frameDepth * 0.15);
+  bridge.position.set(0, preset.lensHeight * 0.14, -0.007 * 0.15);
+  bridge.userData.role = 'frame';
   group.add(bridge);
+
+  // ── Soft shadow (Task 4) ───────────────────────────────────────────────────
+  const shadowGeo = new THREE.PlaneGeometry(0.18, 0.04);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  shadow.position.set(0, -0.012, 0.001);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.userData.role = 'shadow';
+  group.add(shadow);
 
   return group;
 }
 
+// ---------------------------------------------------------------------------
+// updateGlassesColor — uses userData.role instead of instanceof (Task 3)
+// ---------------------------------------------------------------------------
+
 /**
  * Update the frame and lens colors of a procedural glasses model in-place.
- * MeshPhysicalMaterial (lenses) is checked before MeshStandardMaterial (rims/temples)
- * because Physical extends Standard.
+ * Uses userData.role tags to distinguish mesh types, allowing both frame and
+ * lens materials to be MeshPhysicalMaterial.
  */
 export function updateGlassesColor(
   model: THREE.Group,
@@ -147,19 +285,20 @@ export function updateGlassesColor(
   lensHex: string,
 ): void {
   const frameColor = new THREE.Color(frameHex);
-  const lensColor  = new THREE.Color(lensHex);
+  const lensColor = new THREE.Color(lensHex);
 
   model.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const mat of mats) {
-      if (mat instanceof THREE.MeshPhysicalMaterial) {
+      if (obj.userData.role === 'lens') {
         mat.color.copy(lensColor);
         mat.needsUpdate = true;
-      } else if (mat instanceof THREE.MeshStandardMaterial) {
+      } else if (obj.userData.role === 'frame') {
         mat.color.copy(frameColor);
         mat.needsUpdate = true;
       }
+      // 'glare' and 'shadow' are not recolored
     }
   });
 }

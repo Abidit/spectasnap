@@ -6,8 +6,10 @@ import { AlertCircle, Download, Share2 } from 'lucide-react';
 import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
-import { computeTransform, smooth, computeFaceShape, type FaceTransform } from '@/ar/pose';
+import { computeTransform, smoothKalman, createKalmanBank, computeFaceShape, type FaceTransform, type KalmanBank } from '@/ar/pose';
 import type { ColorVariant } from '@/lib/glasses-data';
+import type { LensTint } from '@/ar/presets';
+import { loadCustomFrame } from '@/ar/customFrameLoader';
 import type { ARStatusKind } from '@/components/ARStatusBadge';
 
 type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'error';
@@ -15,6 +17,8 @@ type Status = 'idle' | 'requesting' | 'loading-mp' | 'ready' | 'no-face' | 'erro
 interface ARCameraProps {
   selectedGlasses: GlassesFrame;
   selectedColor?: ColorVariant | null;
+  /** Lens tint variant to apply. */
+  selectedTint?: LensTint | null;
   /** Called whenever the AR tracking state changes so parents can surface it. */
   onARStatusChange?: (status: ARStatusKind) => void;
   /** Called once with the detected face shape when a face is first tracked. */
@@ -50,7 +54,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export default function ARCamera({ selectedGlasses, selectedColor, onARStatusChange, onFaceShapeDetected, captureRef }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor, selectedTint, onARStatusChange, onFaceShapeDetected, captureRef }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -59,6 +63,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
   const glassesImgRef = useRef<HTMLImageElement | null>(null);
   const lastFrameTimeRef = useRef<number>(-1);
   const smoothedTransformRef = useRef<FaceTransform | null>(null);
+  const kalmanBankRef = useRef<KalmanBank | null>(null);
   const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
   const faceLastSeenRef = useRef<number>(-Infinity);
   const faceShapeDetectedRef = useRef(false);
@@ -90,6 +95,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     smoothedTransformRef.current = null;
+    kalmanBankRef.current = null;
     faceLastSeenRef.current = -Infinity;
   }, []);
 
@@ -180,9 +186,9 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
 
         // ── 3-D glasses tracking ─────────────────────────────────────────
         const raw = computeTransform(result.faceLandmarks[0], canvas.width, canvas.height);
-        const prev = smoothedTransformRef.current ?? raw;
-        // position/scale lerp 0.30, rotation lerp 0.22 (snappier response)
-        const smoothed = smooth(prev, raw, 0.3, 0.22);
+        // Kalman filter for near-zero jitter (Task 5)
+        if (!kalmanBankRef.current) kalmanBankRef.current = createKalmanBank();
+        const smoothed = smoothKalman(kalmanBankRef.current, raw);
         smoothedTransformRef.current = smoothed;
         threeSceneRef.current?.applyFaceTransform(smoothed, canvas.width, canvas.height);
         threeSceneRef.current?.updateFaceOccluder(
@@ -314,13 +320,32 @@ export default function ARCamera({ selectedGlasses, selectedColor, onARStatusCha
 
   useEffect(() => {
     if (status !== 'ready') return;
-    void threeSceneRef.current?.selectModel(selectedGlasses.id);
+    const scene = threeSceneRef.current;
+    if (!scene) return;
+
+    // For custom frames, register the custom frame data first
+    if (selectedGlasses.id.startsWith('custom-')) {
+      const data = loadCustomFrame();
+      if (data) {
+        const registeredId = scene.registerCustomFrame(data);
+        void scene.selectModel(registeredId);
+        return;
+      }
+    }
+
+    void scene.selectModel(selectedGlasses.id);
   }, [selectedGlasses.id, status]);
 
   useEffect(() => {
     if (!selectedColor || status !== 'ready') return;
     threeSceneRef.current?.setModelColor(selectedColor.frameHex, selectedColor.lensHex);
   }, [selectedColor, status]);
+
+  // Apply lens tint variant (Task 9)
+  useEffect(() => {
+    if (!selectedTint || status !== 'ready') return;
+    threeSceneRef.current?.setLensTint(selectedTint);
+  }, [selectedTint, status]);
 
   const takeSnapshot = useCallback(() => {
     const videoCanvas = canvasRef.current;
