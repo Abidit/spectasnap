@@ -25,16 +25,12 @@ import {
 } from './occluder';
 import { createProceduralGlasses, updateGlassesColor } from './proceduralGlasses';
 import { getProceduralPreset } from './presets';
-import {
-  buildTempleMeshes,
-  disposeTemples,
-  hideTemples,
-  setTempleDebug,
-  updateTemples,
-  updateTempleColor,
-} from './temples';
 import { createCustomFrameMesh, type CustomFrameData } from './customFrameLoader';
-import { calibrateGLB } from './glbCalibrate';
+import { calibrateGLB, calibrateGLBFrontFrame } from './glbCalibrate';
+import { detectTemples } from './glbTempleDetect';
+import type { TempleDetectionResult } from './glbTempleDetect';
+import { animateTempleSplit, animateTempleBones, type TempleAnimationContext } from './glbTempleAnimate';
+import { createTemplePair } from './proceduralTemples';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +48,13 @@ export interface ModelConfig {
   rotationOffset: { x: number; y: number; z: number };
   /** Custom frame data — only present for type: 'custom'. */
   customData?: CustomFrameData;
+  // — temple metadata for GLB models —
+  /** Whether the GLB includes temple arm meshes. */
+  hasTemples?: boolean;
+  /** Explicit mesh names for temple detection (overrides auto-detect). */
+  templeMeshNames?: string[];
+  /** Temple articulation method. Default: auto-detect. */
+  templeMethod?: 'bone' | 'split' | 'none';
 }
 
 interface OverlayState {
@@ -66,6 +69,8 @@ interface OverlayState {
   activeId: string | null;
   occlusionEnabled: boolean;
   envTexture: THREE.Texture | null;
+  /** Temple detection results keyed by model id. */
+  templeData: Map<string, TempleDetectionResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +155,6 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
   const modelGroup = new THREE.Group();
   scene.add(modelGroup);
   buildOccluderMesh(scene, camera);
-  buildTempleMeshes(scene);
 
   state = {
     renderer,
@@ -163,6 +167,7 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
     activeId: null,
     occlusionEnabled: DEFAULT_OCCLUSION_ENABLED,
     envTexture,
+    templeData: new Map(),
   };
   setOccluderEnabled(DEFAULT_OCCLUSION_ENABLED);
   setOccluderCamera(camera);
@@ -292,6 +297,50 @@ function centerModel(model: THREE.Group): void {
 }
 
 // ---------------------------------------------------------------------------
+// tagGLBMeshRoles — label meshes for color/tint/coating systems (Task B.6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tag meshes in a loaded GLB with userData.role so the color/tint/coating
+ * systems can identify them. Temples get 'temple', lenses get 'lens',
+ * everything else gets 'frame'.
+ */
+function tagGLBMeshRoles(model: THREE.Group, detection: TempleDetectionResult): void {
+  // Tag temple meshes
+  if (detection.leftTemple) {
+    detection.leftTemple.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) obj.userData.role = 'temple';
+    });
+  }
+  if (detection.rightTemple) {
+    detection.rightTemple.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) obj.userData.role = 'temple';
+    });
+  }
+
+  // Tag remaining meshes
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (obj.userData.role) return; // already tagged (temple)
+
+    const name = obj.name.toLowerCase();
+    if (name.includes('lens')) {
+      obj.userData.role = 'lens';
+    } else if (
+      obj.material &&
+      !Array.isArray(obj.material) &&
+      (obj.material as THREE.MeshPhysicalMaterial).transparent === true &&
+      (obj.material as THREE.MeshPhysicalMaterial).opacity < 0.8
+    ) {
+      // Transparent material → likely a lens
+      obj.userData.role = 'lens';
+    } else {
+      obj.userData.role = 'frame';
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // loadGlassesModel
 // ---------------------------------------------------------------------------
 
@@ -318,6 +367,55 @@ async function loadGlassesModel(cfg: ModelConfig): Promise<THREE.Group> {
         model.scale.setScalar(calibration.scale);
         model.position.y += calibration.yOffset;
         model.position.z += calibration.zOffset;
+
+        // Detect temples in the loaded GLB (Task B.4)
+        const templeConfig = {
+          hasTemples: cfg.hasTemples,
+          templeMeshNames: cfg.templeMeshNames,
+          templeMethod: cfg.templeMethod,
+        };
+        const detection = detectTemples(model, templeConfig);
+        state!.templeData.set(cfg.id, detection);
+
+        // Tag meshes with userData.role for color/tint/coating systems (Task B.6)
+        tagGLBMeshRoles(model, detection);
+
+        // If temples were detected, recalibrate using front frame only (Task B.4)
+        if (detection.hasTemples && detection.method === 'split') {
+          const frontCal = calibrateGLBFrontFrame(model, detection.frontFrame);
+          model.scale.setScalar(frontCal.scale);
+          model.position.set(0, frontCal.yOffset, frontCal.zOffset);
+        }
+
+        // If GLB has no temples, attach procedural fallback (Task B.7)
+        if (!detection.hasTemples) {
+          let templePresetId = cfg.presetId;
+          if (!templePresetId) {
+            // Guess from model name
+            const name = cfg.name.toLowerCase();
+            if (name.includes('aviator')) templePresetId = 'aviator-01';
+            else if (name.includes('round')) templePresetId = 'round-01';
+            else if (name.includes('cat')) templePresetId = 'cat-eye-01';
+            else if (name.includes('sport')) templePresetId = 'sport-wrap-01';
+            else templePresetId = 'rectangle-01';
+          }
+
+          const templePreset = getProceduralPreset(templePresetId ?? 'rectangle-01');
+          if (templePreset) {
+            const temples = createTemplePair(templePreset);
+
+            // Position at outer edges of the front frame
+            const frontBox = new THREE.Box3().setFromObject(model);
+            const frontSize = new THREE.Vector3();
+            frontBox.getSize(frontSize);
+
+            temples.left.position.set(-frontSize.x / 2, 0, 0);
+            temples.right.position.set(frontSize.x / 2, 0, 0);
+
+            model.add(temples.left);
+            model.add(temples.right);
+          }
+        }
 
         setRenderOrderRecursive(model, 1);
         model.visible = false;
@@ -413,15 +511,6 @@ export function setActiveModel(id: string | null): void {
       setRenderOrderRecursive(model, 1);
       model.visible = true;
     }
-    // Sync temple color with the newly active frame.
-    // models.json rarely has frameColor, so fall back to the preset's frameColor.
-    const cfg = state.registry.get(id);
-    let syncColor: string | undefined = cfg?.frameColor;
-    if (!syncColor && cfg?.type === 'procedural') {
-      const preset = getProceduralPreset(cfg.presetId ?? id);
-      if (preset) syncColor = preset.frameColor;
-    }
-    if (syncColor) updateTempleColor(syncColor);
   }
 }
 
@@ -468,7 +557,6 @@ export function dispose(): void {
 
   state.cache.clear();
   disposeOccluder();
-  disposeTemples();
   state.envTexture?.dispose();
   state.scene.environment = null;
   state.renderer.dispose();
@@ -548,18 +636,40 @@ export function applyFaceTransform(
   model.rotation.z = -transform.roll + rotOff.z;
 }
 
-// Called every frame alongside applyFaceTransform.
-export function updateTempleExtensions(
-  _landmarks: import('@mediapipe/tasks-vision').NormalizedLandmark[],
-  _transform: FaceTransform,
+// ---------------------------------------------------------------------------
+// animateGLBTemples — per-frame temple arm animation (Task B.4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Animate GLB temple arms to track the user's ears.
+ * Called each frame from ARCamera's render loop.
+ */
+export function animateGLBTemples(
+  landmarks: NormalizedLandmark[],
+  transform: FaceTransform,
   _canvasW: number,
   _canvasH: number,
 ): void {
-  hideTemples();
-}
+  if (!state?.activeId) return;
+  const detection = state.templeData.get(state.activeId);
+  if (!detection?.hasTemples) return;
 
-export function clearTempleExtensions(): void {
-  hideTemples();
+  const { camera } = state;
+  if (detection.method === 'bone') {
+    animateTempleBones(detection as TempleAnimationContext, landmarks, transform, camera);
+  } else if (detection.method === 'split') {
+    const frontGroup = state.cache.get(state.activeId);
+    if (frontGroup && detection.leftTemple && detection.rightTemple) {
+      animateTempleSplit(
+        frontGroup,
+        detection.leftTemple,
+        detection.rightTemple,
+        landmarks,
+        transform,
+        camera,
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -590,13 +700,11 @@ export function setModelOpacity(opacity: number): void {
 
 /**
  * Update the frame and lens colors of the active model in-place.
- * Also syncs the landmark-driven temple arm color.
  */
 export function setModelColor(frameHex: string, lensHex: string): void {
   if (!state) return;
   const model = getActiveModel();
   if (model) updateGlassesColor(model, frameHex, lensHex);
-  updateTempleColor(frameHex);
 }
 
 export function updateFaceOccluder(
@@ -620,10 +728,6 @@ export function setOcclusionEnabled(enabled: boolean): void {
 
 export function setOcclusionDebug(on: boolean): void {
   setOccluderDebug(on);
-}
-
-export function setTempleExtensionDebug(on: boolean): void {
-  setTempleDebug(on);
 }
 
 // ---------------------------------------------------------------------------

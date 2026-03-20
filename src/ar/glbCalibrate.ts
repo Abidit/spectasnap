@@ -68,3 +68,44 @@ export function calibrateGLB(scene: THREE.Group): GLBCalibration {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// calibrateGLBFrontFrame
+// ---------------------------------------------------------------------------
+
+/**
+ * Calibrate using only the front frame portion of a GLB model.
+ * When temples are present, the overall bounding box center shifts backward
+ * along the Z axis. Using the front frame's bounding box gives a more
+ * accurate scale and centering than the full model including temples.
+ *
+ * @param scene     The full model
+ * @param frontFrame Optional front-frame-only group. If not provided, falls back to the full scene.
+ */
+export function calibrateGLBFrontFrame(
+  scene: THREE.Group,
+  frontFrame?: THREE.Group,
+): GLBCalibration {
+  const target = frontFrame ?? scene;
+
+  const box = new THREE.Box3().setFromObject(target);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+
+  // Guard against degenerate (empty or zero-width) bounding boxes.
+  const width = Math.max(size.x, 0.001);
+  const scale = TARGET_WIDTH / width;
+
+  return {
+    scale,
+    yOffset: -center.y * scale,
+    zOffset: -center.z * scale,
+    boundingBox: {
+      width: size.x,
+      height: size.y,
+      depth: size.z,
+    },
+  };
+}

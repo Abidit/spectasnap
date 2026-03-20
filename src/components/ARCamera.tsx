@@ -261,11 +261,13 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
           canvas.width,
           canvas.height
         );
-        threeSceneRef.current?.updateTempleExtensions(
+
+        // ── GLB temple arm animation (Task B.4) ───────────────────────────
+        threeSceneRef.current?.animateGLBTemples(
           result.faceLandmarks[0],
           smoothed,
           canvas.width,
-          canvas.height
+          canvas.height,
         );
 
         // ── PD measurement (when active) ──────────────────────────────────
@@ -294,7 +296,6 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
         setFaceDetected(false);
         setMultipleFaces(false);
         threeSceneRef.current?.clearFaceOccluder();
-        threeSceneRef.current?.clearTempleExtensions();
 
         // ── Stability: hold 500 ms, then fade over 300 ms ─────────────────
         // If user prefers reduced motion, skip the fade and hide immediately
@@ -387,7 +388,6 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('debugOcclusion') === '1') threeSceneRef.current.setOcclusionDebug(true);
-      if (params.get('debugTemples') === '1') threeSceneRef.current.setTempleExtensionDebug(true);
     }
 
     setStatus('ready');
