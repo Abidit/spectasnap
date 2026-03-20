@@ -7,6 +7,8 @@ import type { GlassesFrame } from '@/lib/glasses-data';
 import { drawGlassesOnCanvas, preloadGlassesImage } from '@/lib/face-overlay';
 import ThreeOverlay from '@/components/ThreeOverlay';
 import { computeTransform, smoothKalman, createKalmanBank, computeFaceShape, type FaceTransform, type KalmanBank } from '@/ar/pose';
+import { createPDMeasurer, type PDMeasurement, type PDMeasurer } from '@/ar/pdMeasure';
+import { drawPDOverlay } from '@/ar/pdOverlay';
 import type { ColorVariant } from '@/lib/glasses-data';
 import type { LensTint } from '@/ar/presets';
 import { loadCustomFrame } from '@/ar/customFrameLoader';
@@ -29,6 +31,14 @@ interface ARCameraProps {
    * Used by ShareModal to capture the current look.
    */
   captureRef?: RefObject<(() => string | null) | null>;
+  /** When true, PD measurement runs each frame in the detection loop. */
+  pdMeasuring?: boolean;
+  /** Called with each PD measurement update while pdMeasuring is true. */
+  onPDMeasured?: (pd: PDMeasurement) => void;
+  /** Latest stable PD measurement — included in session analytics payload. */
+  pdMeasurement?: PDMeasurement | null;
+  /** Frame IDs saved to the compare tray — included in session analytics payload. */
+  comparedFrames?: string[];
 }
 
 const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
@@ -54,7 +64,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export default function ARCamera({ selectedGlasses, selectedColor, selectedTint, onARStatusChange, onFaceShapeDetected, captureRef }: ARCameraProps) {
+export default function ARCamera({ selectedGlasses, selectedColor, selectedTint, onARStatusChange, onFaceShapeDetected, captureRef, pdMeasuring, onPDMeasured, pdMeasurement, comparedFrames }: ARCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -67,12 +77,19 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
   const threeSceneRef = useRef<typeof import('@/ar/threeScene') | null>(null);
   const faceLastSeenRef = useRef<number>(-Infinity);
   const faceShapeDetectedRef = useRef(false);
+  const pdMeasurerRef = useRef<PDMeasurer | null>(null);
+  const pdMeasurementRef = useRef<PDMeasurement | null>(null);
+  const comparedFramesRef = useRef<string[]>([]);
   const sessionRef = useRef<{
     store: string;
     faceShape: string | null;
     framesTried: string[];
     startTime: number;
   } | null>(null);
+
+  // Keep refs in sync with latest prop values (read at unmount without adding deps)
+  pdMeasurementRef.current = pdMeasurement ?? null;
+  comparedFramesRef.current = comparedFrames ?? [];
 
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -97,6 +114,8 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     smoothedTransformRef.current = null;
     kalmanBankRef.current = null;
     faceLastSeenRef.current = -Infinity;
+    pdMeasurerRef.current?.reset();
+    pdMeasurerRef.current = null;
   }, []);
 
   const renderLoop = useCallback(() => {
@@ -203,6 +222,20 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
           canvas.height
         );
 
+        // ── PD measurement (when active) ──────────────────────────────────
+        if (pdMeasuring && onPDMeasured) {
+          if (!pdMeasurerRef.current) pdMeasurerRef.current = createPDMeasurer();
+          const pd = pdMeasurerRef.current.update(
+            result.faceLandmarks[0],
+            canvas.width,
+            canvas.height,
+          );
+          onPDMeasured(pd);
+
+          // Draw PD overlay on the 2D canvas (iris markers + dashed line + value)
+          drawPDOverlay(ctx, result.faceLandmarks[0], canvas.width, canvas.height, pd.pdMm);
+        }
+
         // Yaw fade: smoothly fade glasses past ~24°, fully gone by ~33° (just under YAW_MAX)
         const absYaw = Math.abs(smoothed.yaw);
         if (absYaw > 0.42) {
@@ -236,7 +269,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     }
 
     rafRef.current = requestAnimationFrame(renderLoop);
-  }, [selectedGlasses]);
+  }, [selectedGlasses, pdMeasuring, onPDMeasured]);
 
   const startCamera = useCallback(async () => {
     setStatus('requesting');
@@ -406,7 +439,12 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
       // POST final session on unmount
       if (sessionRef.current) {
         const duration = Math.round((Date.now() - sessionRef.current.startTime) / 1000);
-        const payload = { ...sessionRef.current, duration };
+        const payload = {
+          ...sessionRef.current,
+          duration,
+          pd: pdMeasurementRef.current?.stable ? pdMeasurementRef.current.pdMm : null,
+          comparedFrames: comparedFramesRef.current,
+        };
         fetch('/api/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

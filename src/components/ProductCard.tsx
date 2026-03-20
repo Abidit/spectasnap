@@ -2,8 +2,11 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { Share2 } from 'lucide-react';
+import { Share2, Check } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
+import { computeSuitability, getTopRecommendations } from '@/lib/suitability';
+import type { PDMeasurement } from '@/ar/pdMeasure';
+import { getFrameWidthMm } from '@/ar/presets';
 
 interface ProductCardProps {
   frame: GlassesFrame;
@@ -24,18 +27,16 @@ interface ProductCardProps {
   onSelectFrame?: (id: string) => void;
   /** Called when user taps "Share My Look". */
   onShareLook?: () => void;
+  /** Current PD measurement result (null if not yet measured). */
+  pdMeasurement?: PDMeasurement | null;
+  /** Whether PD measurement is currently in progress. */
+  pdMeasuring?: boolean;
+  /** Called when user taps "Measure PD" to start measuring. */
+  onMeasurePD?: () => void;
 }
 
 const ALL_OCCASIONS = ['Casual', 'Office', 'Wedding', 'Sports'] as const;
 
-// Rule-based recommendations per face shape (IDs from GLASSES_COLLECTION)
-const SHAPE_RECS: Record<string, string[]> = {
-  oval:   ['glb-aviator',    'glb-wayfarer',    'glb-round-metal'],
-  round:  ['glb-wayfarer',   'glb-cat-eye',     'glb-aviator'],
-  square: ['glb-round-metal','glb-cat-eye',      'glb-aviator'],
-  heart:  ['glb-aviator',    'glb-cat-eye',      'glb-wayfarer'],
-  oblong: ['glb-wayfarer',   'glb-sport-wrap',   'glb-round-metal'],
-};
 
 const FRAME_MAP = Object.fromEntries(GLASSES_COLLECTION.map((f) => [f.id, f]));
 
@@ -51,6 +52,9 @@ export default function ProductCard({
   faceShape,
   onSelectFrame,
   onShareLook,
+  pdMeasurement,
+  pdMeasuring,
+  onMeasurePD,
 }: ProductCardProps) {
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
 
@@ -154,6 +158,86 @@ export default function ProductCard({
         {/* Divider */}
         <div className="border-t border-brand-border" />
 
+        {/* Suitability Score */}
+        {faceShape ? (
+          (() => {
+            const suitability = computeSuitability(frame.style, faceShape);
+            return (
+              <div>
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+                  Suitability Score
+                </p>
+                <div className="flex items-center gap-2.5 mb-2">
+                  {/* Progress bar track */}
+                  <div
+                    className="flex-1 h-[6px] bg-brand-secondary overflow-hidden"
+                    style={{ borderRadius: 2 }}
+                  >
+                    <div
+                      className="h-full transition-all duration-300 ease-out"
+                      style={{
+                        width: `${suitability.score}%`,
+                        backgroundColor: '#C9A96E',
+                        borderRadius: 2,
+                      }}
+                    />
+                  </div>
+                  {/* Score number */}
+                  <span
+                    className="text-[13px] font-sans font-semibold tabular-nums"
+                    style={{ color: '#C9A96E', minWidth: 22, textAlign: 'right' }}
+                  >
+                    {suitability.score}
+                  </span>
+                </div>
+                {/* Verdict badge + reason */}
+                <div className="flex items-start gap-2">
+                  <span
+                    className="shrink-0 px-2 py-0.5 text-[10px] font-sans font-semibold uppercase tracking-[0.1em]"
+                    style={{
+                      borderRadius: 2,
+                      backgroundColor:
+                        suitability.verdict === 'excellent'
+                          ? 'rgba(201,169,110,0.18)'
+                          : suitability.verdict === 'good'
+                            ? '#EDE8DC'
+                            : 'transparent',
+                      color:
+                        suitability.verdict === 'excellent'
+                          ? '#A8844A'
+                          : suitability.verdict === 'good'
+                            ? '#6B6560'
+                            : '#6B6560',
+                      border:
+                        suitability.verdict === 'fair'
+                          ? '1px solid #DDD8CE'
+                          : '1px solid transparent',
+                    }}
+                  >
+                    {suitability.verdict === 'excellent'
+                      ? 'Excellent Match'
+                      : suitability.verdict === 'good'
+                        ? 'Good Match'
+                        : 'Fair'}
+                  </span>
+                </div>
+                <p className="text-[12px] font-sans italic text-brand-muted mt-1.5 leading-relaxed">
+                  {suitability.reason}
+                </p>
+              </div>
+            );
+          })()
+        ) : (
+          <div>
+            <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+              Suitability Score
+            </p>
+            <p className="text-brand-muted text-xs font-sans italic leading-relaxed">
+              Point camera at your face to see your suitability score
+            </p>
+          </div>
+        )}
+
         {/* Best for */}
         <div>
           <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
@@ -226,23 +310,34 @@ export default function ProductCard({
           </p>
           {faceShape ? (
             <div className="flex flex-col gap-1.5">
-              {(SHAPE_RECS[faceShape.toLowerCase()] ?? SHAPE_RECS.oval).map((id) => {
-                const f = FRAME_MAP[id];
+              {getTopRecommendations(GLASSES_COLLECTION, faceShape, 3).map((rec) => {
+                const f = FRAME_MAP[rec.frameId];
                 if (!f) return null;
                 const isSelected = f.id === frame.id;
                 return (
                   <button
-                    key={id}
-                    onClick={() => onSelectFrame?.(id)}
+                    key={rec.frameId}
+                    onClick={() => onSelectFrame?.(rec.frameId)}
                     className="text-left px-2.5 py-2 text-xs font-sans font-medium
-                               bg-brand-secondary text-brand-text transition-colors duration-150"
+                               bg-brand-secondary text-brand-text transition-colors duration-150
+                               flex items-center justify-between gap-2"
                     style={{
                       borderRadius: 2,
                       border: isSelected ? '1px solid #C9A96E' : '1px solid #DDD8CE',
                       color: isSelected ? '#A8844A' : '#1A1612',
                     }}
                   >
-                    {f.name}
+                    <span>{f.name}</span>
+                    <span
+                      className="shrink-0 text-[10px] font-sans font-semibold tabular-nums px-1.5 py-0.5"
+                      style={{
+                        borderRadius: 2,
+                        backgroundColor: rec.score >= 80 ? 'rgba(201,169,110,0.18)' : '#EDE8DC',
+                        color: rec.score >= 80 ? '#A8844A' : '#6B6560',
+                      }}
+                    >
+                      {rec.score}
+                    </span>
                   </button>
                 );
               })}
@@ -266,6 +361,143 @@ export default function ProductCard({
             &ldquo;{frame.staffNote}&rdquo;
           </p>
         </div>
+
+        {/* Divider */}
+        <div className="border-t border-brand-border" />
+
+        {/* PD Measurement */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+            Pupillary Distance
+          </p>
+          {pdMeasurement?.stable ? (
+            <div className="flex items-center justify-between">
+              <div
+                className="flex items-center gap-2 px-2.5 py-1.5"
+                style={{
+                  borderRadius: 2,
+                  border: '1px solid #C9A96E',
+                  backgroundColor: 'rgba(201,169,110,0.08)',
+                }}
+              >
+                <Check className="w-3.5 h-3.5" style={{ color: '#C9A96E' }} />
+                <span className="text-sm font-sans font-semibold tabular-nums" style={{ color: '#A8844A' }}>
+                  PD: {pdMeasurement.pdMm} mm
+                </span>
+              </div>
+              <button
+                onClick={onMeasurePD}
+                className="text-[11px] font-sans font-medium underline underline-offset-2 transition-colors"
+                style={{ color: '#6B6560' }}
+              >
+                Re-measure
+              </button>
+            </div>
+          ) : pdMeasuring ? (
+            <div className="flex items-center gap-2.5 py-1">
+              <div
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{
+                  backgroundColor: '#C9A96E',
+                  animation: 'pd-pulse 1.2s ease-in-out infinite',
+                }}
+              />
+              <span className="text-xs font-sans font-medium text-brand-muted">
+                Measuring{pdMeasurement ? ` (${pdMeasurement.pdMm} mm)` : ''}...
+              </span>
+              <style>{`
+                @keyframes pd-pulse {
+                  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+                  50%       { opacity: 1; transform: scale(1.15); }
+                }
+              `}</style>
+            </div>
+          ) : (
+            <button
+              onClick={onMeasurePD}
+              className="w-full py-2.5 font-sans font-semibold text-xs tracking-wide
+                         bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
+                         transition-all duration-150"
+              style={{ borderRadius: 2 }}
+              aria-label="Measure pupillary distance"
+            >
+              Measure PD
+            </button>
+          )}
+        </div>
+
+        {/* Frame Fit Indicator — shown when PD is stable */}
+        {pdMeasurement?.stable && (() => {
+          const frameWidth = getFrameWidthMm(frame.id);
+          if (frameWidth === null) return null;
+
+          const pd = pdMeasurement.pdMm;
+          const idealMin = pd + 20;
+          const idealMax = pd + 32;
+
+          type FitCategory = 'narrow' | 'ideal' | 'wide';
+          let fit: FitCategory;
+          if (frameWidth < idealMin) fit = 'narrow';
+          else if (frameWidth > idealMax) fit = 'wide';
+          else fit = 'ideal';
+
+          const segments: { key: FitCategory; label: string }[] = [
+            { key: 'narrow', label: 'Narrow' },
+            { key: 'ideal', label: 'Ideal' },
+            { key: 'wide', label: 'Wide' },
+          ];
+
+          return (
+            <>
+              <div className="border-t border-brand-border" />
+              <div>
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+                  Frame Fit
+                </p>
+                <p className="text-[11px] font-sans text-brand-muted mb-2.5">
+                  Frame width {frameWidth} mm vs PD {pd} mm
+                </p>
+                {/* 3-segment scale bar */}
+                <div className="flex gap-0.5 mb-2" style={{ height: 6 }}>
+                  {segments.map((seg) => (
+                    <div
+                      key={seg.key}
+                      className="flex-1 transition-colors duration-200"
+                      style={{
+                        borderRadius: 2,
+                        backgroundColor:
+                          seg.key === fit
+                            ? seg.key === 'ideal'
+                              ? '#C9A96E'
+                              : '#6B6560'
+                            : '#EDE8DC',
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Labels */}
+                <div className="flex">
+                  {segments.map((seg) => (
+                    <span
+                      key={seg.key}
+                      className="flex-1 text-center text-[10px] font-sans font-semibold uppercase tracking-[0.12em] transition-colors duration-200"
+                      style={{
+                        color:
+                          seg.key === fit
+                            ? seg.key === 'ideal'
+                              ? '#A8844A'
+                              : '#1A1612'
+                            : '#B0ABA6',
+                      }}
+                    >
+                      {seg.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Divider */}
         <div className="border-t border-brand-border" />

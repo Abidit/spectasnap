@@ -5,6 +5,8 @@ interface Session {
   faceShape: string | null;
   framesTried: string[];
   duration: number;
+  pd: number | null;
+  comparedFrames: string[];
   timestamp: number;
   date: string;
 }
@@ -75,6 +77,40 @@ export async function GET(req: Request): Promise<Response> {
       duration: formatDuration(s.duration),
     }));
 
+    // PD distribution across buckets
+    const pdBuckets = { '55-60': 0, '60-65': 0, '65-70': 0, '70+': 0 } as Record<string, number>;
+    let pdCount = 0;
+    sessions.forEach((s) => {
+      const pd = s.pd;
+      if (pd == null) return;
+      pdCount++;
+      if (pd < 60) pdBuckets['55-60']++;
+      else if (pd < 65) pdBuckets['60-65']++;
+      else if (pd < 70) pdBuckets['65-70']++;
+      else pdBuckets['70+']++;
+    });
+    const pdDistribution = Object.fromEntries(
+      Object.entries(pdBuckets).map(([k, v]) => [k, pdCount > 0 ? Math.round((v / pdCount) * 100) : 0]),
+    );
+
+    // Most compared frame pairs — find which frame IDs appear together most often
+    const pairCounts: Record<string, number> = {};
+    sessions.forEach((s) => {
+      const frames = s.comparedFrames ?? [];
+      if (frames.length < 2) return;
+      // Generate all unique pairs from the compared frames
+      for (let i = 0; i < frames.length; i++) {
+        for (let j = i + 1; j < frames.length; j++) {
+          const pair = [frames[i], frames[j]].sort().join(' + ');
+          pairCounts[pair] = (pairCounts[pair] || 0) + 1;
+        }
+      }
+    });
+    const mostComparedPairs = Object.entries(pairCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([pair, count]) => ({ pair, count }));
+
     return Response.json({
       todaySessions,
       weekSessions,
@@ -83,6 +119,9 @@ export async function GET(req: Request): Promise<Response> {
       shapeBreakdown,
       recentSessions,
       totalSessions: sessions.length,
+      pdDistribution,
+      pdCount,
+      mostComparedPairs,
     });
   } catch {
     return Response.json(

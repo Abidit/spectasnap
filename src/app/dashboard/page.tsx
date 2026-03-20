@@ -139,6 +139,9 @@ export default function Dashboard() {
     shapeBreakdown: Record<string, number>;
     recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
     totalSessions: number;
+    pdDistribution?: Record<string, number>;
+    pdCount?: number;
+    mostComparedPairs?: { pair: string; count: number }[];
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(false);
@@ -159,6 +162,9 @@ export default function Dashboard() {
         shapeBreakdown: Record<string, number>;
         recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
         totalSessions: number;
+        pdDistribution?: Record<string, number>;
+        pdCount?: number;
+        mostComparedPairs?: { pair: string; count: number }[];
         error?: string;
       };
       if (!res.ok || data?.error) throw new Error(data?.error ?? 'Failed');
@@ -379,6 +385,76 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* PD Distribution + Most Compared Frames */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* PD Distribution */}
+              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-1">
+                  PD Distribution
+                </p>
+                <p className="text-brand-muted text-[10px] font-sans mb-4">
+                  {liveStats?.pdCount ? `${liveStats.pdCount} measurements` : 'No PD data yet'}
+                </p>
+                {liveStats?.pdDistribution && liveStats.pdCount && liveStats.pdCount > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {(['55-60', '60-65', '65-70', '70+'] as const).map((bucket) => {
+                      const pct = liveStats.pdDistribution?.[bucket] ?? 0;
+                      return (
+                        <div key={bucket} className="flex items-center gap-3">
+                          <span className="text-xs font-sans text-brand-muted w-12 flex-shrink-0">{bucket} mm</span>
+                          <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
+                            <div
+                              className="h-2 transition-all duration-500"
+                              style={{ width: `${pct}%`, backgroundColor: '#C9A96E', borderRadius: 2 }}
+                            />
+                          </div>
+                          <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-brand-muted text-xs font-sans">Measurements will appear here once users complete PD scans.</p>
+                )}
+              </div>
+
+              {/* Most Compared Frames */}
+              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
+                  Most Compared Frames
+                </p>
+                {liveStats?.mostComparedPairs && liveStats.mostComparedPairs.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {liveStats.mostComparedPairs.map((item, i) => (
+                      <div
+                        key={item.pair}
+                        className="flex items-center justify-between py-2 border-b border-brand-border last:border-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-5 h-5 flex items-center justify-center text-[10px] font-sans font-semibold flex-shrink-0"
+                            style={{
+                              borderRadius: 2,
+                              backgroundColor: i === 0 ? '#C9A96E' : '#EDE8DC',
+                              color: i === 0 ? '#1A1612' : '#6B6560',
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                          <span className="text-sm font-sans text-brand-text">{item.pair}</span>
+                        </div>
+                        <span className="text-xs font-sans text-brand-muted flex-shrink-0">
+                          {item.count} {item.count === 1 ? 'session' : 'sessions'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-brand-muted text-xs font-sans">Comparison data will appear here once users save looks to compare.</p>
+                )}
               </div>
             </div>
 

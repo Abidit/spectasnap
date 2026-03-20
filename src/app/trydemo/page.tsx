@@ -6,10 +6,12 @@ import { useSearchParams } from 'next/navigation';
 import { GLASSES_COLLECTION, LENS_TINT_OPTIONS, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
 import { loadCustomFrame } from '@/ar/customFrameLoader';
 import { COLOR_VARIANTS } from '@/ar/presets';
+import type { PDMeasurement } from '@/ar/pdMeasure';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
 import ShareModal from '@/components/ShareModal';
+import CompareTray, { type SavedLook } from '@/components/CompareTray';
 import FeedbackToast, { type ToastData } from '@/components/FeedbackToast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import OfflineBanner from '@/components/OfflineBanner';
@@ -45,7 +47,31 @@ function TryDemo() {
   const [shareDataUrl, setShareDataUrl] = useState<string | null>(null);
   const [selectedTint, setSelectedTint] = useState<LensTint | null>(null);
   const [customFrames, setCustomFrames] = useState<GlassesFrame[]>([]);
+  const [pdMeasurement, setPDMeasurement] = useState<PDMeasurement | null>(null);
+  const [pdMeasuring, setPDMeasuring] = useState(false);
   const captureRef = useRef<(() => string | null) | null>(null);
+  const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
+
+  function handleSaveLook() {
+    if (savedLooks.length >= 4) return;
+    const dataUrl = captureRef.current?.();
+    if (!dataUrl) return;
+    setSavedLooks((prev) => [
+      ...prev,
+      {
+        id: `look-${Date.now()}`,
+        dataUrl,
+        frameName: selected.name,
+        frameId: selected.id,
+        timestamp: Date.now(),
+      },
+    ]);
+    setToast({ message: `Look saved! (${savedLooks.length + 1}/4)`, type: 'success' });
+  }
+
+  function handleRemoveLook(id: string) {
+    setSavedLooks((prev) => prev.filter((l) => l.id !== id));
+  }
 
   // Load custom frame from localStorage when ?customFrame=true
   useEffect(() => {
@@ -106,6 +132,19 @@ function TryDemo() {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
+  const handlePDMeasured = useCallback((pd: PDMeasurement) => {
+    setPDMeasurement(pd);
+    if (pd.stable) {
+      setPDMeasuring(false);
+      setToast({ message: `PD measured: ${pd.pdMm} mm`, type: 'success' });
+    }
+  }, []);
+
+  const handleStartPDMeasure = useCallback(() => {
+    setPDMeasurement(null);
+    setPDMeasuring(true);
+  }, []);
+
   return (
     <div
       className="flex flex-col bg-brand-page"
@@ -124,9 +163,29 @@ function TryDemo() {
             onARStatusChange={setArStatus}
             onFaceShapeDetected={setFaceShape}
             captureRef={captureRef}
+            pdMeasuring={pdMeasuring}
+            onPDMeasured={handlePDMeasured}
+            pdMeasurement={pdMeasurement}
+            comparedFrames={savedLooks.map(l => l.frameId)}
           />
 
           </ErrorBoundary>
+
+          {/* Compare Looks tray */}
+          <div className="absolute top-16 left-4 z-20">
+            <CompareTray
+              looks={savedLooks}
+              onRemove={handleRemoveLook}
+              onSelectFrame={(id) => {
+                const f =
+                  GLASSES_COLLECTION.find((g) => g.id === id) ||
+                  customFrames.find((g) => g.id === id);
+                if (f) handleSelect(f);
+              }}
+              onSave={handleSaveLook}
+              canSave={savedLooks.length < 4 && arStatus === 'tracking'}
+            />
+          </div>
 
           <div
             className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
@@ -163,6 +222,9 @@ function TryDemo() {
                 setShareDataUrl(captureRef.current?.() ?? null);
                 setShareOpen(true);
               }}
+              pdMeasurement={pdMeasurement}
+              pdMeasuring={pdMeasuring}
+              onMeasurePD={handleStartPDMeasure}
             />
           </div>
           {/* AI Stylist CTA — hidden until ANTHROPIC_API_KEY is configured */}
