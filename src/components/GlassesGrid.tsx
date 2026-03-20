@@ -6,7 +6,7 @@ import { Check } from 'lucide-react';
 import { GLASSES_COLLECTION, type GlassesFrame } from '@/lib/glasses-data';
 import clsx from 'clsx';
 
-type FilterFamily = 'all' | 'round' | 'rectangle' | 'aviator' | 'cat-eye' | 'sport-wrap';
+type FilterFamily = 'all' | 'round' | 'rectangle' | 'aviator' | 'cat-eye' | 'sport-wrap' | 'custom';
 
 const FILTERS: { key: FilterFamily; label: string }[] = [
   { key: 'all',        label: 'All'       },
@@ -15,6 +15,7 @@ const FILTERS: { key: FilterFamily; label: string }[] = [
   { key: 'aviator',    label: 'Aviator'   },
   { key: 'cat-eye',    label: 'Cat-Eye'   },
   { key: 'sport-wrap', label: 'Sport'     },
+  { key: 'custom',     label: 'Custom'    },
 ];
 
 /** Normalize a frame's style string to a FilterFamily key. */
@@ -25,30 +26,44 @@ function frameFamily(frame: GlassesFrame): FilterFamily {
 interface GlassesGridProps {
   selected: GlassesFrame;
   onSelect: (frame: GlassesFrame) => void;
+  /** Additional frames (e.g. user-uploaded custom frames) prepended to the grid. */
+  extraFrames?: GlassesFrame[];
 }
 
-export default function GlassesGrid({ selected, onSelect }: GlassesGridProps) {
+export default function GlassesGrid({ selected, onSelect, extraFrames }: GlassesGridProps) {
   const [activeFilter, setActiveFilter] = useState<FilterFamily>('all');
 
-  // Pre-compute counts once
+  // Merge extra frames (custom uploads) with the built-in collection.
+  const collection = useMemo(
+    () => [...(extraFrames ?? []), ...GLASSES_COLLECTION],
+    [extraFrames],
+  );
+
+  // Pre-compute counts
   const counts = useMemo(() => {
     const c: Record<FilterFamily, number> = {
-      all: GLASSES_COLLECTION.length,
-      round: 0, rectangle: 0, aviator: 0, 'cat-eye': 0, 'sport-wrap': 0,
+      all: collection.length,
+      round: 0, rectangle: 0, aviator: 0, 'cat-eye': 0, 'sport-wrap': 0, custom: 0,
     };
-    GLASSES_COLLECTION.forEach((f) => {
+    collection.forEach((f) => {
       const fam = frameFamily(f);
       if (fam in c) c[fam]++;
     });
     return c;
-  }, []);
+  }, [collection]);
 
   const filtered = useMemo(
     () =>
       activeFilter === 'all'
-        ? GLASSES_COLLECTION
-        : GLASSES_COLLECTION.filter((f) => frameFamily(f) === activeFilter),
-    [activeFilter],
+        ? collection
+        : collection.filter((f) => frameFamily(f) === activeFilter),
+    [activeFilter, collection],
+  );
+
+  // Only show filter tabs that have frames (hides "Custom 0" when no custom frames exist)
+  const visibleFilters = useMemo(
+    () => FILTERS.filter((f) => f.key === 'all' || counts[f.key] > 0),
+    [counts],
   );
 
   return (
@@ -69,7 +84,7 @@ export default function GlassesGrid({ selected, onSelect }: GlassesGridProps) {
         aria-label="Filter frames by shape"
         className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide"
       >
-        {FILTERS.map(({ key, label }) => {
+        {visibleFilters.map(({ key, label }) => {
           const isActive = activeFilter === key;
           const count = counts[key];
           const disabled = count === 0;

@@ -323,14 +323,25 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     const scene = threeSceneRef.current;
     if (!scene) return;
 
-    // For custom frames, register the custom frame data first
+    // For custom frames, register the custom frame data first.
+    // ThreeOverlay init is async — poll isReady() until state is initialised (max ~2s).
     if (selectedGlasses.id.startsWith('custom-')) {
       const data = loadCustomFrame();
-      if (data) {
+      if (!data) return;
+
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (!scene.isReady()) {
+          if (attempts >= 20) clearInterval(interval); // give up after ~2s
+          return;
+        }
+        clearInterval(interval);
         const registeredId = scene.registerCustomFrame(data);
         void scene.selectModel(registeredId);
-        return;
-      }
+      }, 100);
+
+      return () => clearInterval(interval);
     }
 
     void scene.selectModel(selectedGlasses.id);
