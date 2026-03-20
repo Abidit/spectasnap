@@ -142,6 +142,12 @@ export default function Dashboard() {
     pdDistribution?: Record<string, number>;
     pdCount?: number;
     mostComparedPairs?: { pair: string; count: number }[];
+    embedSessionCount?: number;
+    directSessionCount?: number;
+    conversionRate?: number;
+    embedConversionRate?: number;
+    avgDuration?: number;
+    askStaffCount?: number;
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(false);
@@ -165,6 +171,12 @@ export default function Dashboard() {
         pdDistribution?: Record<string, number>;
         pdCount?: number;
         mostComparedPairs?: { pair: string; count: number }[];
+        embedSessionCount?: number;
+        directSessionCount?: number;
+        conversionRate?: number;
+        embedConversionRate?: number;
+        avgDuration?: number;
+        askStaffCount?: number;
         error?: string;
       };
       if (!res.ok || data?.error) throw new Error(data?.error ?? 'Failed');
@@ -455,6 +467,119 @@ export default function Dashboard() {
                 ) : (
                   <p className="text-brand-muted text-xs font-sans">Comparison data will appear here once users save looks to compare.</p>
                 )}
+              </div>
+            </div>
+
+            {/* Embed Performance */}
+            <div className="mb-8">
+              <p className="font-serif text-lg font-semibold mb-4" style={{ color: '#1A1612' }}>
+                Embed Performance
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
+                  <p
+                    className="text-xs font-sans font-semibold uppercase mb-1"
+                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
+                  >
+                    Embed Sessions
+                  </p>
+                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
+                    {statsLoading ? '...' : String(liveStats?.embedSessionCount ?? 0)}
+                  </p>
+                </div>
+                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
+                  <p
+                    className="text-xs font-sans font-semibold uppercase mb-1"
+                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
+                  >
+                    Direct Sessions
+                  </p>
+                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
+                    {statsLoading ? '...' : String(liveStats?.directSessionCount ?? 0)}
+                  </p>
+                </div>
+                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
+                  <p
+                    className="text-xs font-sans font-semibold uppercase mb-1"
+                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
+                  >
+                    Conversion Rate
+                  </p>
+                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
+                    {statsLoading ? '...' : `${liveStats?.conversionRate ?? 0}%`}
+                  </p>
+                  <p className="text-brand-muted text-xs font-sans mt-1">
+                    {liveStats?.askStaffCount ?? 0} Ask Staff clicks
+                  </p>
+                </div>
+                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
+                  <p
+                    className="text-xs font-sans font-semibold uppercase mb-1"
+                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
+                  >
+                    Avg Session Duration
+                  </p>
+                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
+                    {statsLoading
+                      ? '...'
+                      : liveStats?.avgDuration
+                        ? formatDuration(liveStats.avgDuration)
+                        : '0s'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Embed vs Direct comparison bar */}
+              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
+                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
+                  Embed vs Direct Sessions
+                </p>
+                {(() => {
+                  const embedCount = liveStats?.embedSessionCount ?? 0;
+                  const directCount = liveStats?.directSessionCount ?? 0;
+                  const maxCount = Math.max(embedCount, directCount, 1);
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-sans text-brand-muted w-16 flex-shrink-0">Embed</span>
+                        <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
+                          <div
+                            className="h-2 transition-all duration-500"
+                            style={{
+                              width: `${Math.round((embedCount / maxCount) * 100)}%`,
+                              backgroundColor: '#C9A96E',
+                              borderRadius: 2,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">
+                          {embedCount}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-sans text-brand-muted w-16 flex-shrink-0">Direct</span>
+                        <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
+                          <div
+                            className="h-2 transition-all duration-500"
+                            style={{
+                              width: `${Math.round((directCount / maxCount) * 100)}%`,
+                              backgroundColor: '#A8844A',
+                              borderRadius: 2,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">
+                          {directCount}
+                        </span>
+                      </div>
+                      {liveStats && liveStats.embedSessionCount !== undefined && liveStats.embedSessionCount > 0 && (
+                        <p className="text-brand-muted text-[10px] font-sans mt-1">
+                          Embed conversion rate: {liveStats.embedConversionRate ?? 0}%
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

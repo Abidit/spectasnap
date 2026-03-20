@@ -21,6 +21,10 @@ interface ProductCardProps {
   onTintChange?: (tint: LensTint) => void;
   /** Called when the user taps "Ask Staff for This Frame". */
   onAskStaff?: () => void;
+  /** If provided, "Ask Staff" button becomes a link to this URL (e.g. WhatsApp or mailto). */
+  contactHref?: string;
+  /** Custom label for the contact button (default "Ask Staff for This Frame"). */
+  contactLabel?: string;
   /** Detected face shape from AR pipeline — used for rule-based recommendations. */
   faceShape?: string | null;
   /** Called when user taps a recommended frame chip. */
@@ -49,6 +53,8 @@ export default function ProductCard({
   activeTint,
   onTintChange,
   onAskStaff,
+  contactHref,
+  contactLabel,
   faceShape,
   onSelectFrame,
   onShareLook,
@@ -504,15 +510,29 @@ export default function ProductCard({
 
         {/* CTAs */}
         <div className="flex flex-col gap-2">
-          <button
-            onClick={onAskStaff}
-            className="w-full py-3 font-sans font-semibold text-sm tracking-wide
-                       bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
-                       transition-all duration-150"
-            style={{ borderRadius: 2 }}
-          >
-            Ask Staff for This Frame
-          </button>
+          {contactHref ? (
+            <a
+              href={contactHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 font-sans font-semibold text-sm tracking-wide
+                         bg-brand-text text-brand-page hover:opacity-90 transition-opacity
+                         text-center inline-flex items-center justify-center"
+              style={{ borderRadius: 2, minHeight: 44, textDecoration: 'none' }}
+            >
+              {contactLabel || 'Ask Staff for This Frame'}
+            </a>
+          ) : (
+            <button
+              onClick={onAskStaff}
+              className="w-full py-3 font-sans font-semibold text-sm tracking-wide
+                         bg-brand-text text-brand-page hover:opacity-90 active:scale-[0.98]
+                         transition-all duration-150"
+              style={{ borderRadius: 2 }}
+            >
+              Ask Staff for This Frame
+            </button>
+          )}
           <button
             onClick={onShareLook}
             className="w-full py-2.5 flex items-center justify-center gap-2 font-sans font-semibold text-sm

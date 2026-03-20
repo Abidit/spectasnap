@@ -6,9 +6,10 @@ import ARStatusBadge, { type ARStatusKind } from '@/components/ARStatusBadge';
 
 interface HeaderProps {
   arStatus?: ARStatusKind;
+  storeName?: string;  // If provided, show store name instead of "Virtual Try-On"
 }
 
-export default function Header({ arStatus }: HeaderProps) {
+export default function Header({ arStatus, storeName }: HeaderProps) {
   return (
     <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-brand-panel border-b border-brand-border z-10">
       {/* Logo — links back to landing page */}
@@ -24,7 +25,7 @@ export default function Header({ arStatus }: HeaderProps) {
 
       {/* Tagline */}
       <p className="hidden sm:block text-brand-muted text-xs tracking-widest uppercase font-sans">
-        Virtual Try-On
+        {storeName || 'Virtual Try-On'}
       </p>
 
       {/* Right side: AR status badge + Dashboard nav link */}

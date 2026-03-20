@@ -7,6 +7,8 @@ interface Session {
   duration: number;
   pd: number | null;
   comparedFrames: string[];
+  askStaffClicked: boolean;
+  embedSource: boolean;
   timestamp: number;
   date: string;
 }
@@ -111,6 +113,30 @@ export async function GET(req: Request): Promise<Response> {
       .slice(0, 3)
       .map(([pair, count]) => ({ pair, count }));
 
+    // Embed vs direct sessions
+    const embedSessions = sessions.filter((s) => s.embedSource);
+    const directSessions = sessions.filter((s) => !s.embedSource);
+
+    // Conversion rate = Ask Staff sessions / total sessions (percentage)
+    const askStaffCount = sessions.filter((s) => s.askStaffClicked).length;
+    const conversionRate =
+      sessions.length > 0 ? Math.round((askStaffCount / sessions.length) * 100) : 0;
+
+    // Embed conversion rate (separate)
+    const embedAskStaffCount = embedSessions.filter((s) => s.askStaffClicked).length;
+    const embedConversionRate =
+      embedSessions.length > 0
+        ? Math.round((embedAskStaffCount / embedSessions.length) * 100)
+        : 0;
+
+    // Average session duration
+    const avgDuration =
+      sessions.length > 0
+        ? Math.round(
+            sessions.reduce((sum, s) => sum + (s.duration || 0), 0) / sessions.length,
+          )
+        : 0;
+
     return Response.json({
       todaySessions,
       weekSessions,
@@ -122,6 +148,12 @@ export async function GET(req: Request): Promise<Response> {
       pdDistribution,
       pdCount,
       mostComparedPairs,
+      embedSessionCount: embedSessions.length,
+      directSessionCount: directSessions.length,
+      conversionRate,
+      embedConversionRate,
+      avgDuration,
+      askStaffCount,
     });
   } catch {
     return Response.json(
