@@ -62,7 +62,7 @@ export function buildOccluderMesh(
     colorWrite: false,
     depthWrite: true,
     depthTest: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
 
   debugOccMat = new THREE.MeshBasicMaterial({
@@ -72,7 +72,7 @@ export function buildOccluderMesh(
     depthTest: true,
     transparent: true,
     opacity: 0.35,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
     wireframe: false,
   });
 
@@ -80,6 +80,7 @@ export function buildOccluderMesh(
   mesh.renderOrder = 0;
   mesh.visible = false;
   mesh.frustumCulled = false;
+  mesh.scale.setScalar(1.02); // Slight enlargement for full face coverage
 
   scene.add(mesh);
 

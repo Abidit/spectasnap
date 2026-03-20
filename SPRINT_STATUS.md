@@ -1,6 +1,6 @@
 # Sprint Status
 
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-03-20
 **Live URL:** https://spectasnap-orpin.vercel.app
 
 ---
@@ -11,7 +11,20 @@ Sprint 3: Done — ShareModal, Share My Look button, snapshot composite + waterm
 Sprint 4: Done — branded loading overlay, /qr page, /onepager print sheet, WHATSAPP_TEMPLATES.md
 Sprint 5: Done — /api/session, /api/stats, Vercel KV session logging, dashboard live data + 30s refresh
 MVP Complete: Yes ✅
-Last Deploy: 2026-03-19
+
+---
+
+Realism Sprint: Done ✅
+- Task 1: Per-style lens materials (default, dark, gold, clear, rose) with MeshPhysicalMaterial
+- Task 2: Environment reflections via RoomEnvironment + PMREMGenerator
+- Task 3: Frame material upgrade — acetate (clearcoat) vs metal (high metalness) + userData.role tagging
+- Task 4: Soft shadow plane under glasses (NormalBlending, 12% opacity)
+- Task 5: Kalman filter smoothing (kalmanjs) — near-zero jitter
+- Task 6: Lens glare highlights (AdditiveBlending, white specular)
+- Task 7: Photo-to-AR pipeline — @imgly/background-removal, custom frame upload/calibrate/test in AR
+- Task 8: Face occluder improvements — FrontSide, 1.02x scale
+- Task 9: Lens tint options — 6 tints (Clear, Smoke, Brown, Blue, Green, Mirror) with sidebar picker
+Last Deploy: 2026-03-20
 
 ---
 

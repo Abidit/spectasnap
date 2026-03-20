@@ -10,8 +10,10 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { FaceTransform } from './pose';
+import type { LensTint } from './presets';
 import {
   buildOccluderMesh,
   disposeOccluder,
@@ -31,6 +33,7 @@ import {
   updateTemples,
   updateTempleColor,
 } from './temples';
+import { createCustomFrameMesh, type CustomFrameData } from './customFrameLoader';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,13 +42,15 @@ import {
 export interface ModelConfig {
   id: string;
   name: string;
-  type: 'glb' | 'procedural';
+  type: 'glb' | 'procedural' | 'custom';
   modelPath?: string;
   presetId?: string;
   frameColor?: string;
   scaleMultiplier: number;
   offset: { x: number; y: number; z: number };
   rotationOffset: { x: number; y: number; z: number };
+  /** Custom frame data — only present for type: 'custom'. */
+  customData?: CustomFrameData;
 }
 
 interface OverlayState {
@@ -59,6 +64,7 @@ interface OverlayState {
   registry: Map<string, ModelConfig>;
   activeId: string | null;
   occlusionEnabled: boolean;
+  envTexture: THREE.Texture | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,21 +119,31 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
   const camera = new THREE.PerspectiveCamera(45, w / h || 1, 0.01, 100);
   camera.position.set(0, 0, 1);
 
-  // ── Lights (ambient + key directional + fill) ─────────────────────────────
+  // ── Environment map (RoomEnvironment for realistic reflections) ───────────
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
+  const roomEnv = new RoomEnvironment();
+  const envTexture = pmremGenerator.fromScene(roomEnv).texture;
+  scene.environment = envTexture;
+  scene.background = null; // Keep transparent for AR compositing
+  roomEnv.dispose();
+  pmremGenerator.dispose();
+
+  // ── Lights ────────────────────────────────────────────────────────────────
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
 
-  const key = new THREE.DirectionalLight(0xffffff, 1.2);
-  key.position.set(0.5, 1.0, 1.0);
-  scene.add(key);
+  const front = new THREE.DirectionalLight(0xffffff, 0.8);
+  front.position.set(0, 2, 4);
+  scene.add(front);
 
-  const fill = new THREE.DirectionalLight(0xb0c4de, 0.4);
-  fill.position.set(-0.5, 0.0, 0.5);
-  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffeedd, 0.3);
+  rim.position.set(-3, 1, -2);
+  scene.add(rim);
 
-  // Hemisphere light for warm underside fill
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x443322, 0.5);
-  scene.add(hemi);
+  const fillLight = new THREE.DirectionalLight(0xddeeff, 0.2);
+  fillLight.position.set(3, 0, 2);
+  scene.add(fillLight);
 
   // ── Model group (holds the active model) ──────────────────────────────────
   const modelGroup = new THREE.Group();
@@ -145,6 +161,7 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
     registry: new Map(),
     activeId: null,
     occlusionEnabled: DEFAULT_OCCLUSION_ENABLED,
+    envTexture,
   };
   setOccluderEnabled(DEFAULT_OCCLUSION_ENABLED);
   setOccluderCamera(camera);
@@ -228,17 +245,20 @@ function buildFallbackGlasses(): THREE.Group {
   const leftLens = new THREE.Mesh(lensGeo, mat);
   leftLens.scale.set(1, 0.72, 1);
   leftLens.position.set(-0.045, 0, 0);
+  leftLens.userData.role = 'frame';
   group.add(leftLens);
 
   const rightLens = new THREE.Mesh(lensGeo, mat);
   rightLens.scale.set(1, 0.72, 1);
   rightLens.position.set(0.045, 0, 0);
+  rightLens.userData.role = 'frame';
   group.add(rightLens);
 
   // Nose bridge: short horizontal bar at the top of the lenses.
   const bridgeGeo = new THREE.BoxGeometry(0.012, 0.004, 0.004);
   const bridge = new THREE.Mesh(bridgeGeo, mat);
   bridge.position.set(0, 0.008, 0);
+  bridge.userData.role = 'frame';
   group.add(bridge);
 
   // Temple arms: thin horizontal bars extending outward.
@@ -246,10 +266,12 @@ function buildFallbackGlasses(): THREE.Group {
 
   const leftTemple = new THREE.Mesh(templeGeo, mat);
   leftTemple.position.set(-0.1, 0, -0.005);
+  leftTemple.userData.role = 'frame';
   group.add(leftTemple);
 
   const rightTemple = new THREE.Mesh(templeGeo, mat);
   rightTemple.position.set(0.1, 0, -0.005);
+  rightTemple.userData.role = 'frame';
   group.add(rightTemple);
 
   setRenderOrderRecursive(group, 1);
@@ -314,9 +336,22 @@ async function loadProceduralModel(cfg: ModelConfig): Promise<THREE.Group> {
   return model;
 }
 
+async function loadCustomModel(cfg: ModelConfig): Promise<THREE.Group> {
+  if (!state) throw new Error('ThreeOverlay not initialised — call initThreeOverlay first');
+  if (!cfg.customData) throw new Error(`Missing customData for custom model "${cfg.id}"`);
+
+  const model = createCustomFrameMesh(cfg.customData);
+  setRenderOrderRecursive(model, 1);
+  model.visible = false;
+  state.modelGroup.add(model);
+  state.cache.set(cfg.id, model);
+  return model;
+}
+
 async function loadModel(cfg: ModelConfig): Promise<THREE.Group> {
   const cached = state?.cache.get(cfg.id);
   if (cached) return cached;
+  if (cfg.type === 'custom') return loadCustomModel(cfg);
   if (cfg.type === 'procedural') return loadProceduralModel(cfg);
   return loadGlassesModel(cfg);
 }
@@ -426,6 +461,8 @@ export function dispose(): void {
   state.cache.clear();
   disposeOccluder();
   disposeTemples();
+  state.envTexture?.dispose();
+  state.scene.environment = null;
   state.renderer.dispose();
   state.renderer.domElement.remove();
   state = null;
@@ -579,6 +616,56 @@ export function setOcclusionDebug(on: boolean): void {
 
 export function setTempleExtensionDebug(on: boolean): void {
   setTempleDebug(on);
+}
+
+// ---------------------------------------------------------------------------
+// setLensTint — apply lens tint variant (Task 9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Update only the lens material properties for a tint variant.
+ * Leaves frame color unchanged.
+ */
+export function setLensTint(tint: LensTint): void {
+  if (!state) return;
+  const model = getActiveModel();
+  if (!model) return;
+
+  const lensColor = new THREE.Color(tint.lensHex);
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'lens') return;
+    const mat = obj.material as THREE.MeshPhysicalMaterial;
+    mat.color.copy(lensColor);
+    mat.transmission = tint.transmission;
+    mat.opacity = tint.opacity;
+    if (tint.metalness !== undefined) mat.metalness = tint.metalness;
+    if (tint.roughness !== undefined) mat.roughness = tint.roughness;
+    mat.needsUpdate = true;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// registerCustomFrame — inject a user-uploaded frame into the registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Register a custom (PNG-overlay) frame so it can be selected via selectModel().
+ * Returns the generated model config ID.
+ */
+export function registerCustomFrame(data: CustomFrameData): string {
+  if (!state) throw new Error('ThreeOverlay not initialised');
+  const id = `custom-${Date.now()}`;
+  const cfg: ModelConfig = {
+    id,
+    name: data.name || 'Custom Frame',
+    type: 'custom',
+    scaleMultiplier: 1.0,
+    offset: { x: 0, y: 0, z: 0 },
+    rotationOffset: { x: 0, y: 0, z: 0 },
+    customData: data,
+  };
+  state.registry.set(id, cfg);
+  return id;
 }
 
 // ---------------------------------------------------------------------------

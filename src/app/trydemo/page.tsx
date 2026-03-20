@@ -1,8 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useCallback, useRef } from 'react';
-import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant } from '@/lib/glasses-data';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { GLASSES_COLLECTION, LENS_TINT_OPTIONS, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
+import { loadCustomFrame } from '@/ar/customFrameLoader';
+import { COLOR_VARIANTS } from '@/ar/presets';
 import Header from '@/components/Header';
 import GlassesGrid from '@/components/GlassesGrid';
 import ProductCard from '@/components/ProductCard';
@@ -22,7 +25,16 @@ const STYLIST_FRAMES = GLASSES_COLLECTION.slice(0, 20).map((f) => ({
   bestFor: f.bestFor,
 }));
 
-export default function TryDemo() {
+export default function TryDemoPage() {
+  return (
+    <Suspense>
+      <TryDemo />
+    </Suspense>
+  );
+}
+
+function TryDemo() {
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<GlassesFrame>(GLASSES_COLLECTION[0]);
   const [selectedColor, setSelectedColor] = useState<ColorVariant | null>(null);
   const [stylePanelOpen, setStylePanelOpen] = useState(false);
@@ -31,12 +43,51 @@ export default function TryDemo() {
   const [faceShape, setFaceShape] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareDataUrl, setShareDataUrl] = useState<string | null>(null);
+  const [selectedTint, setSelectedTint] = useState<LensTint | null>(null);
   const captureRef = useRef<(() => string | null) | null>(null);
 
-  // Reset color when switching frames so each frame shows its default look first
+  // Load custom frame from localStorage when ?customFrame=true
+  useEffect(() => {
+    if (searchParams.get('customFrame') !== 'true') return;
+    const data = loadCustomFrame();
+    if (!data) return;
+
+    // Create a synthetic GlassesFrame entry for the custom frame
+    const customId = `custom-${Date.now()}`;
+    const customFrame: GlassesFrame = {
+      id: customId,
+      name: data.name || 'Custom Frame',
+      color: '#C9A96E',
+      style: 'Custom',
+      styleTag: 'YOUR FRAME',
+      bestFor: ['All face shapes'],
+      occasions: ['Casual', 'Office'],
+      staffNote: 'Your custom uploaded frame.',
+      svg: data.dataUrl, // Use the transparent PNG as the thumbnail
+      scaleFactor: data.widthScale,
+      yOffset: 0,
+      colorVariants: COLOR_VARIANTS,
+    };
+
+    setSelected(customFrame);
+    setToast({
+      message: `Custom frame "${data.name || 'Custom Frame'}" loaded!`,
+      type: 'success',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset color + tint when switching frames so each frame shows its default look first
   function handleSelect(frame: GlassesFrame) {
     setSelected(frame);
     setSelectedColor(null);
+    setSelectedTint(null);
+  }
+
+  // Reset tint when switching frame color
+  function handleColorChange(variant: ColorVariant) {
+    setSelectedColor(variant);
+    setSelectedTint(null);
   }
 
   function handleRecommendation(frameId: string) {
@@ -67,6 +118,7 @@ export default function TryDemo() {
           <ARCamera
             selectedGlasses={selected}
             selectedColor={selectedColor}
+            selectedTint={selectedTint}
             onARStatusChange={setArStatus}
             onFaceShapeDetected={setFaceShape}
             captureRef={captureRef}
@@ -95,7 +147,10 @@ export default function TryDemo() {
               frame={selected}
               colorVariants={selected.colorVariants}
               activeColor={selectedColor}
-              onColorChange={setSelectedColor}
+              onColorChange={handleColorChange}
+              lensTints={LENS_TINT_OPTIONS}
+              activeTint={selectedTint}
+              onTintChange={setSelectedTint}
               onAskStaff={handleAskStaff}
               faceShape={faceShape}
               onSelectFrame={(id) => {

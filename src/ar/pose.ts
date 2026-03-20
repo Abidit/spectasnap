@@ -5,6 +5,7 @@
  */
 
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import KalmanFilter from 'kalmanjs';
 
 // ── Landmark indices (MediaPipe 478-point Face Mesh) ────────────────────────
 const LM_LEFT_EYE    = 33;   // outer left eye corner  (camera-left = person's right)
@@ -141,6 +142,51 @@ export function smooth(
     roll:  prev.roll  + (next.roll  - prev.roll)  * rotAlpha,
     yaw:   prev.yaw   + (next.yaw   - prev.yaw)   * rotAlpha,
     pitch: prev.pitch + (next.pitch - prev.pitch) * rotAlpha,
+  };
+}
+
+// ── Kalman filter smoothing (Task 5) ─────────────────────────────────────────
+
+export interface KalmanBank {
+  cx: KalmanFilter;
+  cy: KalmanFilter;
+  ipd: KalmanFilter;
+  roll: KalmanFilter;
+  yaw: KalmanFilter;
+  pitch: KalmanFilter;
+}
+
+/**
+ * Create a fresh Kalman filter bank — one filter per FaceTransform channel.
+ * R = measurement noise (lower = trust sensor more).
+ * Q = process noise (higher = follow movement faster).
+ */
+export function createKalmanBank(): KalmanBank {
+  return {
+    cx:    new KalmanFilter({ R: 0.008, Q: 2 }),
+    cy:    new KalmanFilter({ R: 0.008, Q: 2 }),
+    ipd:   new KalmanFilter({ R: 0.005, Q: 1 }),
+    pitch: new KalmanFilter({ R: 0.01,  Q: 3 }),
+    yaw:   new KalmanFilter({ R: 0.01,  Q: 3 }),
+    roll:  new KalmanFilter({ R: 0.006, Q: 2 }),
+  };
+}
+
+/**
+ * Pass a raw FaceTransform through the Kalman bank.
+ * Returns a smoothed transform with near-zero jitter.
+ */
+export function smoothKalman(
+  bank: KalmanBank,
+  raw: FaceTransform,
+): FaceTransform {
+  return {
+    cx:    bank.cx.filter(raw.cx),
+    cy:    bank.cy.filter(raw.cy),
+    ipd:   bank.ipd.filter(raw.ipd),
+    roll:  bank.roll.filter(raw.roll),
+    yaw:   bank.yaw.filter(raw.yaw),
+    pitch: bank.pitch.filter(raw.pitch),
   };
 }
 

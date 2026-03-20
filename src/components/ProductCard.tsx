@@ -3,13 +3,19 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { Share2 } from 'lucide-react';
-import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant } from '@/lib/glasses-data';
+import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant, type LensTint } from '@/lib/glasses-data';
 
 interface ProductCardProps {
   frame: GlassesFrame;
   colorVariants?: ColorVariant[];
   activeColor?: ColorVariant | null;
   onColorChange?: (variant: ColorVariant) => void;
+  /** Lens tint variants to display. */
+  lensTints?: LensTint[];
+  /** Currently active lens tint. */
+  activeTint?: LensTint | null;
+  /** Called when user taps a lens tint. */
+  onTintChange?: (tint: LensTint) => void;
   /** Called when the user taps "Ask Staff for This Frame". */
   onAskStaff?: () => void;
   /** Detected face shape from AR pipeline — used for rule-based recommendations. */
@@ -38,6 +44,9 @@ export default function ProductCard({
   colorVariants,
   activeColor,
   onColorChange,
+  lensTints,
+  activeTint,
+  onTintChange,
   onAskStaff,
   faceShape,
   onSelectFrame,
@@ -107,6 +116,39 @@ export default function ProductCard({
               })}
             </div>
           </div>
+        )}
+
+        {/* Lens tint picker (Task 9) */}
+        {lensTints && lensTints.length > 0 && (
+          <>
+            <div className="border-t border-brand-border" />
+            <div>
+              <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-2">
+                Lens Tint
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {lensTints.map((tint) => {
+                  const isActive = activeTint?.label === tint.label;
+                  return (
+                    <button
+                      key={tint.label}
+                      onClick={() => onTintChange?.(tint)}
+                      className="px-2.5 py-1 text-xs font-sans font-medium transition-all duration-150"
+                      style={{
+                        borderRadius: 2,
+                        border: isActive ? '1px solid #C9A96E' : '1px solid #DDD8CE',
+                        backgroundColor: isActive ? 'rgba(201,169,110,0.12)' : '#FDFAF4',
+                        color: isActive ? '#A8844A' : '#1A1612',
+                      }}
+                      aria-pressed={isActive}
+                    >
+                      {tint.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {/* Divider */}
