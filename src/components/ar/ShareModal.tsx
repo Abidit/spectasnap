@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { X, Download, MessageCircle } from 'lucide-react';
 
 interface ShareModalProps {
@@ -9,27 +10,84 @@ interface ShareModalProps {
   dataUrl: string | null;
   /** Type of media being shared. Defaults to 'image'. */
   mediaType?: 'image' | 'video';
+  /** Frame name for the shared look */
+  frameName?: string;
 }
 
-export default function ShareModal({ isOpen, onClose, dataUrl, mediaType = 'image' }: ShareModalProps) {
+// ── Watermark compositing ─────────────────────────────────────────────────────
+
+function addWatermark(srcDataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(srcDataUrl); return; }
+
+      // Draw original image
+      ctx.drawImage(img, 0, 0);
+
+      // Watermark text settings
+      const fontSize = Math.round(canvas.width * 0.038);
+      ctx.font = `italic ${fontSize}px 'Cormorant Garamond', Georgia, serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+
+      const text = 'SpectaSnap';
+      const padX = Math.round(canvas.width * 0.03);
+      const padY = Math.round(canvas.height * 0.025);
+
+      // Subtle shadow for legibility
+      ctx.shadowColor = 'rgba(10,10,10,0.45)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 1;
+
+      ctx.fillStyle = 'rgba(245,240,232,0.88)';
+      ctx.fillText(text, canvas.width - padX, canvas.height - padY);
+
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => resolve(srcDataUrl);
+    img.src = srcDataUrl;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function ShareModal({ isOpen, onClose, dataUrl, mediaType = 'image', frameName }: ShareModalProps) {
+  const [downloading, setDownloading] = useState(false);
+
   if (!isOpen) return null;
 
-  function handleDownload() {
+  async function handleDownload() {
     if (!dataUrl) return;
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = mediaType === 'video' ? 'spectasnap-recording.webm' : 'spectasnap-look.jpg';
-    a.click();
+    setDownloading(true);
+    try {
+      let finalUrl = dataUrl;
+      if (mediaType === 'image') {
+        finalUrl = await addWatermark(dataUrl);
+      }
+      const a = document.createElement('a');
+      a.href = finalUrl;
+      a.download = mediaType === 'video' ? 'spectasnap-recording.webm' : 'spectasnap-look.jpg';
+      a.click();
+    } finally {
+      setDownloading(false);
+    }
   }
 
   function handleShare() {
+    const frameText = frameName ? ` in ${frameName}` : '';
     const text =
-      'Check out my frames look! 🕶️ Try it yourself: https://spectasnap-orpin.vercel.app/trydemo';
+      `Check out my look${frameText}! 🕶️ Try AR glasses on yourself: https://spectasnap-orpin.vercel.app/trydemo`;
     if (typeof navigator !== 'undefined' && navigator.share) {
       navigator
         .share({
           title: 'My SpectaSnap Look',
-          text: 'Try frames on your face live!',
+          text: `Try on glasses in AR — no app needed!`,
           url: 'https://spectasnap-orpin.vercel.app/trydemo',
         })
         .catch(() => {});
@@ -110,8 +168,8 @@ export default function ShareModal({ isOpen, onClose, dataUrl, mediaType = 'imag
         {/* Action buttons */}
         <div className="flex flex-col gap-2">
           <button
-            onClick={handleDownload}
-            disabled={!dataUrl}
+            onClick={() => void handleDownload()}
+            disabled={!dataUrl || downloading}
             className="w-full py-3 flex items-center justify-center gap-2
                        font-sans font-semibold text-sm tracking-wide
                        bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-40
@@ -119,7 +177,7 @@ export default function ShareModal({ isOpen, onClose, dataUrl, mediaType = 'imag
             style={{ borderRadius: 2 }}
           >
             <Download className="w-4 h-4" />
-            Download
+            {downloading ? 'Saving…' : 'Download'}
           </button>
           <button
             onClick={handleShare}

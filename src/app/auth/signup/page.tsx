@@ -4,101 +4,237 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 export default function SignupPage() {
+  const [storeName, setStoreName] = useState('');
+  const [yourName, setYourName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [city, setCity] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!agreed) return;
     setLoading(true);
-    // Supabase integration deferred — stub
+    // Auth integration deferred — stub
     setTimeout(() => setLoading(false), 1000);
   }
 
   return (
-    <div className="min-h-screen bg-cream-100 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex">
+      {/* ── Left panel — hidden on mobile ── */}
+      <div className="hidden lg:flex w-1/2 bg-dark flex-col justify-between p-12">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <p className="font-serif text-2xl font-semibold text-ink-900">
-            Specta<em style={{ color: '#C9A96E' }}>Snap</em>
+        <p className="font-serif text-3xl italic text-cream-50">
+          Specta<span style={{ color: '#C9A96E' }}>Snap</span>
+        </p>
+
+        {/* Quote */}
+        <div>
+          <p className="font-serif text-4xl italic text-cream-50 leading-tight">
+            Start your free trial today.
           </p>
-          <p className="text-xs font-sans tracking-widest uppercase text-ink-300 mt-1">
-            Create your account
+          <p className="font-sans text-sm mt-4" style={{ color: 'rgba(253,250,244,0.4)' }}>
+            Live AR try-on for optical stores.
           </p>
         </div>
 
-        <div className="bg-cream-50 border border-cream-400 p-6" style={{ borderRadius: 2 }}>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
-                Your Name
-              </label>
-              <input
-                type="text"
-                required
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                style={{ borderRadius: 2 }}
-                placeholder="Aditya Shah"
-              />
-            </div>
+        {/* Stats */}
+        <p
+          className="font-sans text-xs uppercase tracking-widest"
+          style={{ color: 'rgba(253,250,244,0.2)' }}
+        >
+          50+ frames · 478 landmarks · 60fps
+        </p>
+      </div>
 
-            <div>
-              <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
+      {/* ── Right panel — form ── */}
+      <div className="flex-1 bg-cream-100 flex items-center justify-center p-8">
+        <div
+          className="bg-cream-50 border border-cream-400 p-8 w-full max-w-sm"
+          style={{ borderRadius: 2 }}
+        >
+          {/* Eyebrow */}
+          <p
+            className="font-sans font-semibold uppercase mb-2"
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              color: '#A8844A',
+            }}
+          >
+            Create Account
+          </p>
+
+          {/* Heading */}
+          <h1 className="font-serif text-3xl text-ink-900 mb-1">30-day free trial</h1>
+          <p className="font-sans text-sm text-ink-500 mb-8">No credit card required</p>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+            {/* Store Name */}
+            <div className="mb-4">
+              <label
+                htmlFor="signup-store-name"
+                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+              >
                 Store Name
               </label>
               <input
+                id="signup-store-name"
                 type="text"
                 required
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
                 style={{ borderRadius: 2 }}
                 placeholder="Shah Opticals"
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
-                Email
+            {/* Your Name */}
+            <div className="mb-4">
+              <label
+                htmlFor="signup-your-name"
+                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+              >
+                Your Name
               </label>
               <input
-                type="email"
+                id="signup-your-name"
+                type="text"
                 required
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                value={yourName}
+                onChange={(e) => setYourName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
                 style={{ borderRadius: 2 }}
-                placeholder="you@storename.com"
+                placeholder="Aditya Shah"
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
+            {/* Email */}
+            <div className="mb-4">
+              <label
+                htmlFor="signup-email"
+                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+              >
+                Email
+              </label>
+              <input
+                id="signup-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
+                style={{ borderRadius: 2 }}
+                placeholder="you@store.com"
+              />
+            </div>
+
+            {/* Password */}
+            <div className="mb-4">
+              <label
+                htmlFor="signup-password"
+                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+              >
                 Password
               </label>
               <input
+                id="signup-password"
                 type="password"
                 required
                 minLength={8}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
                 style={{ borderRadius: 2 }}
                 placeholder="Min. 8 characters"
               />
             </div>
 
+            {/* City */}
+            <div className="mb-4">
+              <label
+                htmlFor="signup-city"
+                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+              >
+                City
+              </label>
+              <input
+                id="signup-city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
+                style={{ borderRadius: 2 }}
+                placeholder="Mumbai"
+              />
+            </div>
+
+            {/* Terms */}
+            <label className="flex items-start gap-2.5 mb-6 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 accent-gold-500 flex-shrink-0"
+                style={{ borderRadius: 2 }}
+              />
+              <span className="font-sans text-xs text-ink-500 leading-relaxed">
+                I agree to the{' '}
+                <Link href="/terms" className="text-gold-600 hover:underline font-semibold">
+                  Terms of Service
+                </Link>
+              </span>
+            </label>
+
+            {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 font-sans font-semibold text-sm uppercase tracking-wide
-                         bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-50 transition-opacity"
+              disabled={loading || !agreed}
+              className="w-full py-3 font-sans font-semibold text-sm bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-50 transition-opacity"
               style={{ borderRadius: 2, minHeight: 44 }}
             >
-              {loading ? 'Creating account…' : 'Create Account'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="animate-spin h-4 w-4 text-cream-50"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8H4z"
+                    />
+                  </svg>
+                  Creating account&hellip;
+                </span>
+              ) : (
+                'Create my store \u2192'
+              )}
             </button>
           </form>
 
-          <p className="text-center text-xs font-sans text-ink-500 mt-4">
+          {/* Footer */}
+          <p className="text-center font-sans text-xs text-ink-500 mt-5">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-gold-600 hover:underline font-medium">
+            <Link href="/auth/login" className="text-gold-600 hover:underline font-semibold">
               Sign in
             </Link>
           </p>
