@@ -7,6 +7,7 @@ import { GLASSES_COLLECTION, type GlassesFrame, type ColorVariant, type LensTint
 import { computeSuitability, getTopRecommendations } from '@/lib/suitability';
 import type { PDMeasurement } from '@/ar/pdMeasure';
 import { getFrameWidthMm } from '@/ar/presets';
+import AIStylePanel from '@/components/ar/AIStylePanel';
 
 interface ProductCardProps {
   frame: GlassesFrame;
@@ -74,8 +75,10 @@ export default function ProductCard({
   onLensCoatingChange,
 }: ProductCardProps) {
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   return (
+    <div className="relative overflow-hidden" style={{ minHeight: '100%' }}>
     <AnimatePresence mode="wait">
       <motion.div
         key={frame.id}
@@ -444,6 +447,19 @@ export default function ProductCard({
           )}
         </div>
 
+        {/* AI Recommendation trigger */}
+        <button
+          onClick={() => setAiPanelOpen(true)}
+          className="w-full py-2.5 text-sm font-sans text-ink-500 border border-cream-400
+                     hover:border-gold-500 hover:text-ink-900 transition-colors duration-150
+                     flex items-center justify-center gap-1.5"
+          style={{ borderRadius: 2 }}
+          aria-label="Get AI frame recommendation"
+        >
+          <span style={{ color: '#C9A96E' }}>✦</span>
+          Get AI Recommendation
+        </button>
+
         {/* Divider */}
         <div className="border-t border-cream-400" />
 
@@ -641,5 +657,14 @@ export default function ProductCard({
         </div>
       </motion.div>
     </AnimatePresence>
+
+    {/* AI Stylist slide-in panel */}
+    <AIStylePanel
+      open={aiPanelOpen}
+      onClose={() => setAiPanelOpen(false)}
+      faceShape={faceShape}
+      onSelectFrame={onSelectFrame}
+    />
+    </div>
   );
 }
