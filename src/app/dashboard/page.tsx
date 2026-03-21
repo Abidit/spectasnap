@@ -1,674 +1,510 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { MoreHorizontal, Download, Glasses } from 'lucide-react';
+import Sidebar from '@/components/layout/Sidebar';
+import TopBar from '@/components/layout/TopBar';
+import BottomNav from '@/components/layout/BottomNav';
 
-// ─── Seed data (generated once at module level) ──────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const FRAME_NAMES = [
-  'Featured Aviator', 'Featured Round', 'Featured Wayfarer', 'Featured Cat-Eye', 'Featured Wrap',
-  'Classic Rectangle', 'Slim Oval', 'Bold Aviator', 'Retro Round', 'Modern Cat-Eye',
+const CORRECT_PIN = '1234';
+const STORE_NAME = 'Flagship Store';
+
+// ─── Mock data (static, spec-defined) ─────────────────────────────────────────
+
+const FACE_SHAPE_DATA = [
+  { label: 'Oval',    pct: 38 },
+  { label: 'Round',   pct: 24 },
+  { label: 'Square',  pct: 18 },
+  { label: 'Heart',   pct: 12 },
+  { label: 'Oblong',  pct: 8  },
 ];
-const FACE_SHAPES = ['Oval', 'Round', 'Square', 'Heart', 'Diamond', 'Oblong'];
 
-function seededRandom(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    return ((s >>> 0) / 0xffffffff);
-  };
-}
+const TOP_FRAMES_DATA = [
+  { name: "Avenue '24",    trend: '+14%', positive: true,  neutral: false },
+  { name: 'Riviera Gold',  trend: '+8%',  positive: true,  neutral: false },
+  { name: 'Oxford Noir',   trend: 'Stable', positive: false, neutral: true },
+  { name: 'Parisian Mist', trend: '-2%',  positive: false, neutral: false },
+];
 
-interface Session {
-  id: string;
-  timestamp: number;
-  frame: string;
-  faceShape: string;
-  duration: number; // seconds
-}
-
-interface Settings {
-  storeName: string;
-  city: string;
-  hours: string;
-}
-
-const rng = seededRandom(42);
-const SEED_SESSIONS: Session[] = Array.from({ length: 50 }, (_, i) => {
-  const daysAgo = Math.floor(rng() * 7);
-  const hoursAgo = Math.floor(rng() * 10);
-  const ts = Date.now() - (daysAgo * 86400 + hoursAgo * 3600) * 1000 + i * 60000;
-  return {
-    id: `s${i}`,
-    timestamp: ts,
-    frame: FRAME_NAMES[Math.floor(rng() * FRAME_NAMES.length)],
-    faceShape: FACE_SHAPES[Math.floor(rng() * FACE_SHAPES.length)],
-    duration: 45 + Math.floor(rng() * 195),
-  };
-});
-
-const DEFAULT_SETTINGS: Settings = { storeName: 'Visionary Optics', city: 'New York', hours: 'Mon–Sat 9am–6pm' };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDuration(secs: number) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-function formatTimestamp(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
-    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
-function mode(arr: string[]): string {
-  const counts: Record<string, number> = {};
-  for (const v of arr) counts[v] = (counts[v] ?? 0) + 1;
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
-}
-
-function isToday(ts: number) {
-  const d = new Date(ts);
-  const now = new Date();
-  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-}
+const RECENT_SESSIONS = [
+  { shape: 'Oval',    hash: '0x4E...D921', frames: 8,  duration: '2m 14s', timeAgo: '2 min ago'  },
+  { shape: 'Round',   hash: '0x8A...F104', frames: 3,  duration: '0m 45s', timeAgo: '5 min ago'  },
+  { shape: 'Oblong',  hash: '0x22...B330', frames: 12, duration: '4m 02s', timeAgo: '12 min ago' },
+  { shape: 'Square',  hash: '0xFD...0021', frames: 5,  duration: '1m 30s', timeAgo: '18 min ago' },
+  { shape: 'Heart',   hash: '0xCC...8891', frames: 2,  duration: '0m 22s', timeAgo: '24 min ago' },
+  { shape: 'Oval',    hash: '0x91...A223', frames: 14, duration: '5m 55s', timeAgo: '29 min ago' },
+  { shape: 'Oval',    hash: '0x44...C210', frames: 6,  duration: '2m 10s', timeAgo: '35 min ago' },
+  { shape: 'Round',   hash: '0xBB...E882', frames: 1,  duration: '0m 12s', timeAgo: '41 min ago' },
+];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  delta,
+  sub,
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  sub?: string;
+}) {
   return (
-    <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
-      <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-1">{label}</p>
-      <p className="font-serif text-3xl font-semibold text-brand-text leading-none">{value}</p>
-      {sub && <p className="text-brand-muted text-xs font-sans mt-1">{sub}</p>}
+    <div
+      className="bg-cream-50 border border-cream-400 p-5"
+      style={{ borderRadius: 2 }}
+    >
+      <p className="text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-ink-300 mb-2">
+        {label}
+      </p>
+      <p
+        className="font-serif text-5xl text-ink-900 leading-none"
+        style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)' }}
+      >
+        {value}
+      </p>
+      {delta && (
+        <p className="text-xs text-emerald-600 mt-1 font-sans">{delta}</p>
+      )}
+      {sub && !delta && (
+        <p className="text-xs text-ink-300 mt-1 font-sans">{sub}</p>
+      )}
     </div>
   );
 }
 
-function ShapeBar({ label, count, max }: { label: string; count: number; max: number }) {
-  const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+function FaceShapeBar({ label, pct, delay }: { label: string; pct: number; delay: number }) {
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setWidth(pct), delay);
+    return () => clearTimeout(timer);
+  }, [pct, delay]);
+
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs font-sans text-brand-muted w-16 flex-shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
+      <span className="text-sm font-sans text-ink-900 w-16 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-cream-200 rounded-full overflow-hidden">
         <div
-          className="h-2 transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: '#C9A96E', borderRadius: 2 }}
+          className="h-full bg-gold-500 rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${width}%` }}
         />
       </div>
-      <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">{pct}%</span>
+      <span className="text-sm font-sans text-ink-500 w-8 text-right flex-shrink-0">{pct}%</span>
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── PIN Gate ─────────────────────────────────────────────────────────────────
 
-type View = 'pin' | 'dashboard';
-
-const CORRECT_PIN = '1234';
-
-export default function Dashboard() {
-  const router = useRouter();
-  const [view, setView] = useState<View>('pin');
-  const [pin, setPin] = useState('');
+function PinGate({ onUnlock }: { onUnlock: () => void }) {
+  const [pin, setPin] = useState(['', '', '', '']);
   const [shake, setShake] = useState(false);
-  // Seed data used as fallback while real KV data loads
-  const [sessions] = useState<Session[]>(() => {
-    if (typeof window === 'undefined') return SEED_SESSIONS;
-    const raw = localStorage.getItem('spectasnap_dashboard');
-    if (raw) return JSON.parse(raw) as Session[];
-    localStorage.setItem('spectasnap_dashboard', JSON.stringify(SEED_SESSIONS));
-    return SEED_SESSIONS;
-  });
-  const [settings, setSettings] = useState<Settings>(() => {
-    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-    const raw = localStorage.getItem('spectasnap_settings');
-    return raw ? (JSON.parse(raw) as Settings) : DEFAULT_SETTINGS;
-  });
-  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [error, setError] = useState(false);
+  const inputRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
 
-  // Live data from Vercel KV API
-  const [liveStats, setLiveStats] = useState<{
-    todaySessions: number;
-    weekSessions: number;
-    topFrame: string;
-    topShape: string;
-    shapeBreakdown: Record<string, number>;
-    recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
-    totalSessions: number;
-    pdDistribution?: Record<string, number>;
-    pdCount?: number;
-    mostComparedPairs?: { pair: string; count: number }[];
-    embedSessionCount?: number;
-    directSessionCount?: number;
-    conversionRate?: number;
-    embedConversionRate?: number;
-    avgDuration?: number;
-    askStaffCount?: number;
-  } | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsError, setStatsError] = useState(false);
+  function handleInput(index: number, value: string) {
+    // Only accept single digit
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const newPin = [...pin];
+    newPin[index] = digit;
+    setPin(newPin);
+    setError(false);
 
-  const fetchStats = useCallback(async () => {
-    const store =
-      typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('store') || 'default'
-        : 'default';
-    setStatsLoading(true);
-    try {
-      const res = await fetch(`/api/stats?store=${store}`);
-      const data = (await res.json()) as {
-        todaySessions: number;
-        weekSessions: number;
-        topFrame: string;
-        topShape: string;
-        shapeBreakdown: Record<string, number>;
-        recentSessions: { timeAgo: string; faceShape: string; framesTried: number; duration: string }[];
-        totalSessions: number;
-        pdDistribution?: Record<string, number>;
-        pdCount?: number;
-        mostComparedPairs?: { pair: string; count: number }[];
-        embedSessionCount?: number;
-        directSessionCount?: number;
-        conversionRate?: number;
-        embedConversionRate?: number;
-        avgDuration?: number;
-        askStaffCount?: number;
-        error?: string;
-      };
-      if (!res.ok || data?.error) throw new Error(data?.error ?? 'Failed');
-      setLiveStats(data);
-      setStatsError(false);
-    } catch {
-      setStatsError(true);
-    } finally {
-      setStatsLoading(false);
+    if (digit && index < 3) {
+      inputRefs[index + 1].current?.focus();
     }
-  }, []);
 
-  // Fetch real data when dashboard unlocks; auto-refresh every 30s
-  useEffect(() => {
-    if (view !== 'dashboard') return;
-    void fetchStats();
-    const interval = setInterval(() => void fetchStats(), 30000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-
-  function handleDigit(d: string) {
-    if (pin.length >= 4) return;
-    const next = pin + d;
-    setPin(next);
-    if (next.length === 4) {
-      if (next === CORRECT_PIN) {
-        setView('dashboard');
+    if (digit && index === 3) {
+      const full = [...newPin.slice(0, 3), digit].join('');
+      if (full === CORRECT_PIN) {
+        onUnlock();
       } else {
         setShake(true);
-        setTimeout(() => { setShake(false); setPin(''); }, 600);
+        setError(true);
+        setTimeout(() => {
+          setShake(false);
+          setPin(['', '', '', '']);
+          setError(false);
+          inputRefs[0].current?.focus();
+        }, 600);
       }
     }
   }
 
-  function saveSettings() {
-    localStorage.setItem('spectasnap_settings', JSON.stringify(settings));
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 2000);
+  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace') {
+      if (!pin[index] && index > 0) {
+        const newPin = [...pin];
+        newPin[index - 1] = '';
+        setPin(newPin);
+        inputRefs[index - 1].current?.focus();
+      }
+    }
   }
 
-  // Stats — prefer live API data, fall back to seed data
-  const total = liveStats?.totalSessions ?? sessions.length;
-  const todaySessions = sessions.filter((s) => isToday(s.timestamp));
-  const todayCount = liveStats?.todaySessions ?? todaySessions.length;
-  const avgDuration = sessions.length > 0
-    ? Math.round(sessions.reduce((a, s) => a + s.duration, 0) / sessions.length)
-    : 0;
-  const mostTriedFrame = liveStats?.topFrame ?? mode(sessions.map((s) => s.frame));
+  return (
+    <div className="min-h-screen bg-cream-100 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <p className="font-serif text-2xl font-semibold text-ink-900">
+            Specta<em style={{ color: '#C9A96E' }}>Snap</em>
+          </p>
+        </div>
 
-  // Face shape distribution
-  const shapeCounts = FACE_SHAPES.map((sh) => ({
-    label: sh,
-    count: sessions.filter((s) => s.faceShape === sh).length,
-  })).sort((a, b) => b.count - a.count);
-  const maxShapeCount = shapeCounts[0]?.count ?? 1;
+        {/* Card */}
+        <div
+          className="bg-cream-50 border border-cream-400 p-10 text-center"
+          style={{ borderRadius: 2 }}
+        >
+          <h2
+            className="font-serif text-2xl font-semibold text-ink-900 mt-0"
+            style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
+          >
+            Store Access
+          </h2>
+          <p className="text-sm font-sans text-ink-500 mt-2">Enter your 4-digit PIN</p>
 
-  // Popular frames
-  const frameCounts: Record<string, number> = {};
-  for (const s of sessions) frameCounts[s.frame] = (frameCounts[s.frame] ?? 0) + 1;
-  const popularFrames = Object.entries(frameCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([name, count]) => ({ name, count, pct: Math.round((count / total) * 100) }));
+          {/* OTP boxes */}
+          <motion.div
+            className="flex gap-3 justify-center mt-8"
+            animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : { x: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <input
+                key={i}
+                ref={inputRefs[i]}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={pin[i]}
+                onChange={(e) => handleInput(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                onFocus={(e) => e.target.select()}
+                autoFocus={i === 0}
+                className="text-center font-serif text-3xl text-ink-900 outline-none
+                           transition-colors duration-150"
+                style={{
+                  width: 56,
+                  height: 64,
+                  borderRadius: 2,
+                  backgroundColor: error ? 'rgba(239,68,68,0.06)' : pin[i] ? 'rgba(201,169,110,0.08)' : '#F5F0E8',
+                  border: error
+                    ? '1px solid #f87171'
+                    : pin[i]
+                    ? '1px solid #C9A96E'
+                    : '1px solid #DDD8CE',
+                  fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)',
+                }}
+                aria-label={`PIN digit ${i + 1}`}
+              />
+            ))}
+          </motion.div>
 
-  // Recent sessions (last 10, newest first)
-  const recentSessions = [...sessions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+          {error && (
+            <p className="text-xs font-sans text-red-400 mt-3 transition-opacity">
+              Incorrect PIN. Try again.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard body ───────────────────────────────────────────────────────────
+
+function DashboardContent() {
+  const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-brand-page">
-      <AnimatePresence mode="wait">
-        {/* ── PIN Gate ─────────────────────────────────────────────────────── */}
-        {view === 'pin' && (
-          <motion.div
-            key="pin"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="min-h-screen flex flex-col items-center justify-center gap-8 px-6"
+    <div className="max-w-5xl mx-auto px-5 py-8">
+      {/* Page header: "Go Live" button */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-[10px] font-sans font-semibold tracking-[0.14em] uppercase text-ink-300">
+            Overview
+          </p>
+          <h1
+            className="font-serif text-3xl font-semibold text-ink-900 leading-tight"
+            style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
           >
-            <div className="text-center">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-brand-muted mb-2">SpectaSnap</p>
-              <h1 className="font-serif text-3xl font-semibold text-brand-text">Store Dashboard</h1>
-              <p className="text-brand-muted text-sm font-sans mt-2">Enter your PIN to continue</p>
-            </div>
+            Dashboard
+          </h1>
+        </div>
+        <button
+          onClick={() => router.push('/trydemo')}
+          className="px-5 py-2.5 font-sans font-semibold text-sm tracking-wide
+                     hover:opacity-90 active:scale-[0.98] transition-all"
+          style={{
+            borderRadius: 2,
+            backgroundColor: '#C9A96E',
+            color: '#1A1612',
+            minHeight: 40,
+          }}
+        >
+          Go Live →
+        </button>
+      </div>
 
-            {/* PIN dots */}
-            <motion.div
-              className="flex gap-3"
-              animate={shake ? { x: [0, -8, 8, -8, 8, 0] } : { x: 0 }}
-              transition={{ duration: 0.4 }}
+      {/* Stats row — 4 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label="Sessions Today"
+          value="142"
+          delta="↑ 12% vs yesterday"
+        />
+        <StatCard
+          label="Sessions This Week"
+          value="1,084"
+          delta="↑ 4% vs last week"
+        />
+        <StatCard
+          label="Most Tried"
+          value="Avenue"
+          sub="412 interactions"
+        />
+        <StatCard
+          label="Top Face Shape"
+          value="Oval"
+          sub="38% of users"
+        />
+      </div>
+
+      {/* Two-column: Face Shape + Top Frames */}
+      <div className="grid grid-cols-5 gap-6 mb-6">
+        {/* Left — Face Shape Distribution (col-span-3) */}
+        <div
+          className="col-span-5 md:col-span-3 bg-cream-50 border border-cream-400 p-6"
+          style={{ borderRadius: 2 }}
+        >
+          <div className="flex items-start justify-between mb-1">
+            <div>
+              <h2
+                className="font-serif text-xl text-ink-900"
+                style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
+              >
+                Face Shape Distribution
+              </h2>
+              <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-300 mt-0.5">
+                Historical Biometric Data
+              </p>
+            </div>
+            <button
+              className="text-ink-300 hover:text-ink-500 transition-colors"
+              aria-label="More options"
             >
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="w-3.5 h-3.5 border border-brand-border"
-                  style={{
-                    borderRadius: '50%',
-                    backgroundColor: i < pin.length ? '#C9A96E' : 'transparent',
-                    transition: 'background-color 0.1s',
-                  }}
-                />
-              ))}
-            </motion.div>
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
 
-            {/* Numpad */}
-            <div className="grid grid-cols-3 gap-2" style={{ width: 200 }}>
-              {['1','2','3','4','5','6','7','8','9'].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => handleDigit(d)}
-                  className="font-sans font-medium text-lg text-brand-text bg-brand-secondary
-                             border border-brand-border hover:bg-brand-border transition-colors
-                             flex items-center justify-center"
-                  style={{ borderRadius: 2, height: 56 }}
-                >
-                  {d}
-                </button>
-              ))}
-              <div /> {/* spacer */}
-              <button
-                onClick={() => handleDigit('0')}
-                className="font-sans font-medium text-lg text-brand-text bg-brand-secondary
-                           border border-brand-border hover:bg-brand-border transition-colors
-                           flex items-center justify-center"
-                style={{ borderRadius: 2, height: 56 }}
-              >
-                0
-              </button>
-              <button
-                onClick={() => setPin((p) => p.slice(0, -1))}
-                className="font-sans font-medium text-sm text-brand-muted bg-brand-secondary
-                           border border-brand-border hover:bg-brand-border transition-colors
-                           flex items-center justify-center"
-                style={{ borderRadius: 2, height: 56 }}
-              >
-                ⌫
-              </button>
-            </div>
-          </motion.div>
-        )}
+          <div className="flex flex-col gap-4 mt-6">
+            {FACE_SHAPE_DATA.map((item, i) => (
+              <FaceShapeBar
+                key={item.label}
+                label={item.label}
+                pct={item.pct}
+                delay={i * 80}
+              />
+            ))}
+          </div>
+        </div>
 
-        {/* ── Dashboard ────────────────────────────────────────────────────── */}
-        {view === 'dashboard' && (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="max-w-5xl mx-auto px-5 py-8"
+        {/* Right — Top Frames This Week (col-span-2) */}
+        <div
+          className="col-span-5 md:col-span-2 bg-cream-50 border border-cream-400 p-6"
+          style={{ borderRadius: 2 }}
+        >
+          <h2
+            className="font-serif text-xl text-ink-900 mb-4"
+            style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
-              <div>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.14em] uppercase text-brand-muted">
-                  SpectaSnap
-                </p>
-                <h1 className="font-serif text-3xl font-semibold text-brand-text leading-tight">Dashboard</h1>
-                <p className="text-brand-muted text-sm font-sans mt-0.5">{settings.storeName}</p>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <p className="text-brand-muted text-xs font-sans hidden sm:block">
-                  {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </p>
-                <button
-                  onClick={() => router.push('/trydemo')}
-                  className="px-5 py-2.5 font-sans font-semibold text-sm tracking-wide
-                             bg-brand-text text-brand-page hover:opacity-90 transition-opacity"
-                  style={{ borderRadius: 2 }}
+            Top Frames This Week
+          </h2>
+
+          {/* Table header */}
+          <div className="flex justify-between items-center mb-2 pb-2 border-b border-cream-400">
+            <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300">
+              Frame Name
+            </span>
+            <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300">
+              Trend
+            </span>
+          </div>
+
+          {TOP_FRAMES_DATA.map((f) => (
+            <div
+              key={f.name}
+              className="flex justify-between items-center py-3 border-b border-cream-400 last:border-0"
+            >
+              <div className="flex items-center gap-2">
+                <Glasses size={14} className="text-ink-300 flex-shrink-0" />
+                <span
+                  className="font-serif italic text-base text-ink-900"
+                  style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)' }}
                 >
-                  Go Live →
-                </button>
+                  {f.name}
+                </span>
               </div>
+              <span
+                className="text-sm font-sans font-medium"
+                style={{
+                  color: f.neutral ? '#9A9490' : f.positive ? '#059669' : '#ef4444',
+                }}
+              >
+                {f.trend}
+              </span>
             </div>
+          ))}
+        </div>
+      </div>
 
-            {/* Stat cards */}
-            {statsError && (
-              <div className="mb-4 px-4 py-2 border border-brand-border text-brand-muted text-xs font-sans" style={{ borderRadius: 2 }}>
-                Could not load live data. Showing demo data. Refresh to retry.
-              </div>
-            )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard label="Total Try-Ons" value={statsLoading ? '…' : String(total)} />
-              <StatCard label="Today's Sessions" value={statsLoading ? '…' : String(todayCount)} sub={liveStats ? 'live' : 'demo data'} />
-              <StatCard label="Avg Session Time" value={formatDuration(avgDuration)} />
-              <StatCard label="Most Tried Frame" value={mostTriedFrame.split(' ').slice(-1)[0]} sub={mostTriedFrame} />
-            </div>
-
-            {/* Two-column section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Face Shape Distribution */}
-              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
-                  Face Shape Distribution
-                </p>
-                <div className="flex flex-col gap-3">
-                  {shapeCounts.map((sc) => (
-                    <ShapeBar key={sc.label} label={sc.label} count={sc.count} max={maxShapeCount} />
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Sessions */}
-              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
-                  Recent Sessions
-                </p>
-                <div className="flex flex-col divide-y divide-brand-border">
-                  {recentSessions.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between py-2 gap-2">
-                      <span className="text-brand-muted text-[10px] font-sans flex-shrink-0">
-                        {formatTimestamp(s.timestamp)}
-                      </span>
-                      <span className="text-brand-text text-xs font-sans flex-1 text-center truncate">{s.frame}</span>
-                      <span className="text-brand-muted text-[10px] font-sans flex-shrink-0">
-                        {formatDuration(s.duration)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* PD Distribution + Most Compared Frames */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* PD Distribution */}
-              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-1">
-                  PD Distribution
-                </p>
-                <p className="text-brand-muted text-[10px] font-sans mb-4">
-                  {liveStats?.pdCount ? `${liveStats.pdCount} measurements` : 'No PD data yet'}
-                </p>
-                {liveStats?.pdDistribution && liveStats.pdCount && liveStats.pdCount > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    {(['55-60', '60-65', '65-70', '70+'] as const).map((bucket) => {
-                      const pct = liveStats.pdDistribution?.[bucket] ?? 0;
-                      return (
-                        <div key={bucket} className="flex items-center gap-3">
-                          <span className="text-xs font-sans text-brand-muted w-12 flex-shrink-0">{bucket} mm</span>
-                          <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
-                            <div
-                              className="h-2 transition-all duration-500"
-                              style={{ width: `${pct}%`, backgroundColor: '#C9A96E', borderRadius: 2 }}
-                            />
-                          </div>
-                          <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-brand-muted text-xs font-sans">Measurements will appear here once users complete PD scans.</p>
-                )}
-              </div>
-
-              {/* Most Compared Frames */}
-              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
-                  Most Compared Frames
-                </p>
-                {liveStats?.mostComparedPairs && liveStats.mostComparedPairs.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    {liveStats.mostComparedPairs.map((item, i) => (
-                      <div
-                        key={item.pair}
-                        className="flex items-center justify-between py-2 border-b border-brand-border last:border-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-5 h-5 flex items-center justify-center text-[10px] font-sans font-semibold flex-shrink-0"
-                            style={{
-                              borderRadius: 2,
-                              backgroundColor: i === 0 ? '#C9A96E' : '#EDE8DC',
-                              color: i === 0 ? '#1A1612' : '#6B6560',
-                            }}
-                          >
-                            {i + 1}
-                          </span>
-                          <span className="text-sm font-sans text-brand-text">{item.pair}</span>
-                        </div>
-                        <span className="text-xs font-sans text-brand-muted flex-shrink-0">
-                          {item.count} {item.count === 1 ? 'session' : 'sessions'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-brand-muted text-xs font-sans">Comparison data will appear here once users save looks to compare.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Embed Performance */}
-            <div className="mb-8">
-              <p className="font-serif text-lg font-semibold mb-4" style={{ color: '#1A1612' }}>
-                Embed Performance
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
-                  <p
-                    className="text-xs font-sans font-semibold uppercase mb-1"
-                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
-                  >
-                    Embed Sessions
-                  </p>
-                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
-                    {statsLoading ? '...' : String(liveStats?.embedSessionCount ?? 0)}
-                  </p>
-                </div>
-                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
-                  <p
-                    className="text-xs font-sans font-semibold uppercase mb-1"
-                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
-                  >
-                    Direct Sessions
-                  </p>
-                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
-                    {statsLoading ? '...' : String(liveStats?.directSessionCount ?? 0)}
-                  </p>
-                </div>
-                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
-                  <p
-                    className="text-xs font-sans font-semibold uppercase mb-1"
-                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
-                  >
-                    Conversion Rate
-                  </p>
-                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
-                    {statsLoading ? '...' : `${liveStats?.conversionRate ?? 0}%`}
-                  </p>
-                  <p className="text-brand-muted text-xs font-sans mt-1">
-                    {liveStats?.askStaffCount ?? 0} Ask Staff clicks
-                  </p>
-                </div>
-                <div className="bg-brand-panel border border-brand-border p-4" style={{ borderRadius: 2 }}>
-                  <p
-                    className="text-xs font-sans font-semibold uppercase mb-1"
-                    style={{ color: '#C9A96E', letterSpacing: '0.12em' }}
-                  >
-                    Avg Session Duration
-                  </p>
-                  <p className="font-serif text-2xl font-bold" style={{ color: '#1A1612' }}>
-                    {statsLoading
-                      ? '...'
-                      : liveStats?.avgDuration
-                        ? formatDuration(liveStats.avgDuration)
-                        : '0s'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Embed vs Direct comparison bar */}
-              <div className="bg-brand-panel border border-brand-border p-5" style={{ borderRadius: 2 }}>
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
-                  Embed vs Direct Sessions
-                </p>
-                {(() => {
-                  const embedCount = liveStats?.embedSessionCount ?? 0;
-                  const directCount = liveStats?.directSessionCount ?? 0;
-                  const maxCount = Math.max(embedCount, directCount, 1);
-                  return (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-sans text-brand-muted w-16 flex-shrink-0">Embed</span>
-                        <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
-                          <div
-                            className="h-2 transition-all duration-500"
-                            style={{
-                              width: `${Math.round((embedCount / maxCount) * 100)}%`,
-                              backgroundColor: '#C9A96E',
-                              borderRadius: 2,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">
-                          {embedCount}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-sans text-brand-muted w-16 flex-shrink-0">Direct</span>
-                        <div className="flex-1 h-2 bg-brand-secondary" style={{ borderRadius: 2 }}>
-                          <div
-                            className="h-2 transition-all duration-500"
-                            style={{
-                              width: `${Math.round((directCount / maxCount) * 100)}%`,
-                              backgroundColor: '#A8844A',
-                              borderRadius: 2,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-sans text-brand-muted w-8 text-right flex-shrink-0">
-                          {directCount}
-                        </span>
-                      </div>
-                      {liveStats && liveStats.embedSessionCount !== undefined && liveStats.embedSessionCount > 0 && (
-                        <p className="text-brand-muted text-[10px] font-sans mt-1">
-                          Embed conversion rate: {liveStats.embedConversionRate ?? 0}%
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Popular Frames Table */}
-            <div className="bg-brand-panel border border-brand-border mb-8" style={{ borderRadius: 2 }}>
-              <div className="p-5 border-b border-brand-border">
-                <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted">
-                  Popular Frames
-                </p>
-              </div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-brand-border">
-                    <th className="text-left px-5 py-2.5 text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-brand-muted">Frame</th>
-                    <th className="text-right px-5 py-2.5 text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-brand-muted">Try-Ons</th>
-                    <th className="text-right px-5 py-2.5 text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-brand-muted hidden sm:table-cell">% Sessions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {popularFrames.map((f, i) => (
-                    <tr
-                      key={f.name}
-                      className="border-b border-brand-border last:border-0"
-                      style={{ backgroundColor: i % 2 === 0 ? '#FDFAF4' : '#F5F0E8' }}
-                    >
-                      <td className="px-5 py-3 text-sm font-sans text-brand-text">{f.name}</td>
-                      <td className="px-5 py-3 text-sm font-sans text-brand-text text-right font-semibold">{f.count}</td>
-                      <td className="px-5 py-3 text-sm font-sans text-brand-muted text-right hidden sm:table-cell">{f.pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Store Settings */}
-            <div className="bg-brand-panel border border-brand-border p-5 mb-8" style={{ borderRadius: 2 }}>
-              <p className="text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-brand-muted mb-4">
-                Store Settings
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                {([
-                  ['Store Name', 'storeName', 'e.g. Visionary Optics'],
-                  ['City', 'city', 'e.g. New York'],
-                  ['Hours', 'hours', 'e.g. Mon–Sat 9am–6pm'],
-                ] as const).map(([label, key, placeholder]) => (
-                  <div key={key}>
-                    <label className="text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-brand-muted block mb-1.5">
-                      {label}
-                    </label>
-                    <input
-                      type="text"
-                      value={settings[key]}
-                      placeholder={placeholder}
-                      onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.value }))}
-                      className="w-full px-3 py-2 bg-brand-page border border-brand-border text-sm font-sans text-brand-text
-                                 focus:outline-none focus:border-brand-gold transition-colors"
-                      style={{ borderRadius: 2 }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={saveSettings}
-                  className="px-5 py-2 font-sans font-semibold text-sm border border-brand-text
-                             text-brand-text hover:bg-brand-secondary transition-colors"
-                  style={{ borderRadius: 2 }}
-                >
-                  Save Settings
-                </button>
-                {settingsSaved && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-xs font-sans text-brand-muted"
-                  >
-                    Saved ✓
-                  </motion.span>
-                )}
-              </div>
-            </div>
-
-            <p className="text-center text-brand-muted text-[10px] font-sans tracking-wide pb-4">
-              SpectaSnap AR © 2026 · Dashboard data stored locally on this device
+      {/* Recent Sessions — full width */}
+      <div
+        className="bg-cream-50 border border-cream-400"
+        style={{ borderRadius: 2 }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-6 pb-0">
+          <div>
+            <h2
+              className="font-serif text-xl text-ink-900"
+              style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
+            >
+              Recent Sessions
+            </h2>
+            <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300 mt-0.5">
+              Live Stream of Customer Interactions
             </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-cream-400 text-xs font-sans
+                       font-semibold text-ink-500 hover:border-ink-900 hover:text-ink-900 transition-colors"
+            style={{ borderRadius: 2 }}
+          >
+            <Download size={12} />
+            Export CSV
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="border-b border-cream-400">
+                {['Face Shape', 'User Hash', 'Frames Viewed', 'Duration', 'Time Ago'].map((col) => (
+                  <th
+                    key={col}
+                    className="px-6 py-3 text-left text-[10px] font-sans font-semibold uppercase
+                               tracking-[0.1em] text-ink-300 whitespace-nowrap"
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {RECENT_SESSIONS.map((s, i) => (
+                <tr
+                  key={i}
+                  className="border-b border-cream-100 hover:bg-cream-100 transition-colors"
+                >
+                  {/* Face shape */}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-5 h-5 rounded-full bg-cream-200 flex-shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span className="text-sm font-sans text-ink-900">{s.shape}</span>
+                    </div>
+                  </td>
+                  {/* User hash */}
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-mono text-ink-300">{s.hash}</span>
+                  </td>
+                  {/* Frames viewed */}
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-sans text-ink-900">{s.frames}</span>
+                  </td>
+                  {/* Duration */}
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-sans text-ink-900">{s.duration}</span>
+                  </td>
+                  {/* Time ago */}
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-sans text-ink-300">{s.timeAgo}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-center text-ink-300 text-[10px] font-sans tracking-wide py-6">
+        SpectaSnap AR © 2026 · Analytics refresh every 30s
+      </p>
     </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const [unlocked, setUnlocked] = useState(false);
+
+  const handleUnlock = useCallback(() => {
+    setUnlocked(true);
+  }, []);
+
+  return (
+    <AnimatePresence mode="wait">
+      {!unlocked ? (
+        <motion.div
+          key="pin"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <PinGate onUnlock={handleUnlock} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="dashboard"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25 }}
+          className="flex h-screen overflow-hidden bg-cream-100"
+        >
+          {/* Sidebar */}
+          <Sidebar />
+
+          {/* Main area */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <TopBar pageTitle="Dashboard" storeName={STORE_NAME} />
+            <main className="flex-1 overflow-y-auto">
+              <DashboardContent />
+            </main>
+          </div>
+
+          {/* Mobile bottom nav */}
+          <BottomNav />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
