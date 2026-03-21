@@ -1,52 +1,58 @@
-# Sprint Status
+# SpectaSnap Sprint Status
 
-**Last Updated:** 2026-03-20
+**Current:** Clean Build — Sprint 1 Complete ✅
+**Last Updated:** 2026-03-21
 **Live URL:** https://spectasnap-orpin.vercel.app
 
 ---
 
-Sprint 1: Done
-Sprint 2: Done (AI Stylist hidden — rule-based "Recommended For You" active; re-enable when ANTHROPIC_API_KEY is set)
-Sprint 3: Done — ShareModal, Share My Look button, snapshot composite + watermark, WhatsApp share
-Sprint 4: Done — branded loading overlay, /qr page, /onepager print sheet, WHATSAPP_TEMPLATES.md
-Sprint 5: Done — /api/session, /api/stats, Vercel KV session logging, dashboard live data + 30s refresh
-MVP Complete: Yes ✅
+## Clean Build Sprints
+
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| Sprint 1 | Core AR Experience (/trydemo) | ✅ Complete |
+| Sprint 2 | Store Owner Tools (/dashboard) | ⏳ Pending |
+| Sprint 3 | Distribution (landing + share) | ⏳ Pending |
+| Sprint 4 | Polish & Fundraise Prep | ⏳ Pending |
 
 ---
 
-Realism Sprint: Done ✅
-- Task 1: Per-style lens materials (default, dark, gold, clear, rose) with MeshPhysicalMaterial
-- Task 2: Environment reflections via RoomEnvironment + PMREMGenerator
-- Task 3: Frame material upgrade — acetate (clearcoat) vs metal (high metalness) + userData.role tagging
-- Task 4: Soft shadow plane under glasses (NormalBlending, 12% opacity)
-- Task 5: Kalman filter smoothing (kalmanjs) — near-zero jitter
-- Task 6: Lens glare highlights (AdditiveBlending, white specular)
-- Task 7: Photo-to-AR pipeline — @imgly/background-removal, custom frame upload/calibrate/test in AR
-- Task 8: Face occluder improvements — FrontSide, 1.02x scale
-- Task 9: Lens tint options — 6 tints (Clear, Smoke, Brown, Blue, Green, Mirror) with sidebar picker
-Last Deploy: 2026-03-20
+## Sprint 1 Checklist
+
+### UI & Frontend (Dev 1)
+- [x] Design tokens: cream/ink/gold Tailwind tokens
+- [x] Font: Inter (body) + Cormorant Garamond (display)
+- [x] `/trydemo` idle screen (dark, serif logo, pulsing ring)
+- [x] `/trydemo` active layout (camera + sidebar + frame bar)
+- [x] MobileBottomSheet — 3 snap heights (P0 fix)
+- [x] Global layout shell (Sidebar + TopBar + BottomNav)
+- [x] UI primitives (Button, Input, Badge, Toast)
+- [x] Stub pages: /frames, /pricing, /auth/*
+
+### AR Engine (Dev 2)
+- [x] Frame scale × 0.85 (threeScene.ts BASE_SCALE_FACTOR)
+- [x] Lens opacity → 0.22 (proceduralGlasses.ts)
+- [x] Kalman Q values reduced 50% (smooth tracking equivalent)
+- [x] Yaw fade at 0.6 rad (already correct ✓)
+
+### QA (Dev 3)
+- [x] yarn tsc --noEmit → 0 errors
+- [x] yarn build → 0 errors (26 routes)
+- [ ] Full verification checklist pass
+- [ ] vercel --prod deploy
 
 ---
+
+## Previous Sprint History (archived)
+Previous sprints 1–5 complete. Clean build started 2026-03-21.
 
 ## CEO — ANTHROPIC_API_KEY (when ready)
+1. vercel.com → spectasnap → Settings → Environment Variables
+2. Add: ANTHROPIC_API_KEY = sk-ant-...
+3. vercel --prod
 
-```
-1. vercel.com/dashboard
-2. spectasnap → Settings → Environment Variables
-3. Add: ANTHROPIC_API_KEY = sk-ant-...
-   Environments: Production + Preview
-4. vercel --prod
-```
-
-AI Stylist code is preserved in AIStylePanel.tsx — set the env var and it auto-activates.
-
----
-
-## CEO — Vercel KV (Sprint 5 persistence — run once)
-
+## CEO — Vercel KV
 ```bash
 npx vercel kv create spectasnap-sessions
 vercel --prod
 ```
-
-Dashboard shows demo seed data until KV is provisioned. After setup, real session data flows automatically.
