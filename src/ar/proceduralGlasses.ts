@@ -21,27 +21,27 @@ const LENS_PRESETS: Record<string, LensMaterialConfig> = {
   default: {
     color: 0x88aacc, metalness: 0.0, roughness: 0.05,
     transmission: 0.92, thickness: 0.5, ior: 1.5,
-    opacity: 0.18, envMapIntensity: 1.2,
+    opacity: 0.22, envMapIntensity: 1.2, // Clean build: unified lens opacity
   },
   dark: {
     color: 0x111111, metalness: 0.0, roughness: 0.08,
     transmission: 0.35, thickness: 0.5, ior: 1.5,
-    opacity: 0.65, envMapIntensity: 1.2,
+    opacity: 0.65, envMapIntensity: 1.2, // Dark tint stays heavier
   },
   gold: {
     color: 0xc9a96e, metalness: 0.3, roughness: 0.05,
     transmission: 0.45, thickness: 0.5, ior: 1.5,
-    opacity: 0.55, envMapIntensity: 1.2,
+    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.55
   },
   clear: {
     color: 0xccddee, metalness: 0.0, roughness: 0.02,
     transmission: 0.96, thickness: 0.5, ior: 1.5,
-    opacity: 0.08, envMapIntensity: 1.2,
+    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.08
   },
   rose: {
     color: 0xc4826a, metalness: 0.0, roughness: 0.06,
     transmission: 0.5, thickness: 0.5, ior: 1.5,
-    opacity: 0.5, envMapIntensity: 1.2,
+    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.5
   },
 };
 

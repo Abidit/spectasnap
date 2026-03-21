@@ -125,8 +125,8 @@ export function computeTransform(
  *
  * @param prev      Last smoothed transform (seed with `next` on first frame)
  * @param next      Raw transform from computeTransform
- * @param posAlpha  Blend weight for cx, cy, ipd  (recommended: 0.18)
- * @param rotAlpha  Blend weight for roll, yaw, pitch (recommended: 0.12;
+ * @param posAlpha  Blend weight for cx, cy, ipd  (recommended: 0.65)
+ * @param rotAlpha  Blend weight for roll, yaw, pitch (recommended: 0.65;
  *                  defaults to posAlpha if omitted)
  */
 export function smooth(
@@ -162,13 +162,14 @@ export interface KalmanBank {
  * Q = process noise (higher = follow movement faster).
  */
 export function createKalmanBank(): KalmanBank {
+  // Clean build: reduced Q values → 50% less jitter (smoother tracking)
   return {
-    cx:    new KalmanFilter({ R: 0.008, Q: 2 }),
-    cy:    new KalmanFilter({ R: 0.008, Q: 2 }),
-    ipd:   new KalmanFilter({ R: 0.005, Q: 1 }),
-    pitch: new KalmanFilter({ R: 0.01,  Q: 3 }),
-    yaw:   new KalmanFilter({ R: 0.01,  Q: 3 }),
-    roll:  new KalmanFilter({ R: 0.006, Q: 2 }),
+    cx:    new KalmanFilter({ R: 0.008, Q: 1.0 }),
+    cy:    new KalmanFilter({ R: 0.008, Q: 1.0 }),
+    ipd:   new KalmanFilter({ R: 0.005, Q: 0.5 }),
+    pitch: new KalmanFilter({ R: 0.01,  Q: 1.5 }),
+    yaw:   new KalmanFilter({ R: 0.01,  Q: 1.5 }),
+    roll:  new KalmanFilter({ R: 0.006, Q: 1.0 }),
   };
 }
 

@@ -617,7 +617,7 @@ export function dispose(): void {
  * BASE_SCALE_FACTOR: multiplied against IPD-derived world scale.
  *   Increase to make glasses larger relative to the face, decrease to shrink.
  */
-const BASE_SCALE_FACTOR = 0.72;
+const BASE_SCALE_FACTOR = 0.85; // Clean build: reduced frame size (was 0.72)
 
 /**
  * Position, scale, and roll-rotate the active model to match the detected face.
