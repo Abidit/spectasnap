@@ -2,20 +2,31 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!SUPABASE_CONFIGURED) { setSent(true); return; }
     setLoading(true);
-    // Auth integration deferred — stub
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/new-password`,
+      });
+      if (authError) { setError(authError.message); return; }
       setSent(true);
-    }, 1000);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

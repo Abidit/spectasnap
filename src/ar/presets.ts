@@ -72,9 +72,9 @@ function computeFrameWidthMm(lensWidth: number, lensGap: number, bridgeWidth: nu
 const SHAPES = [
   ['Oval', 'Round', 'Heart'],
   ['Square', 'Oval', 'Oblong'],
-  ['Heart', 'Diamond', 'Oval'],
+  ['Heart', 'Oblong', 'Oval'],
   ['Round', 'Square', 'Oval'],
-  ['Oblong', 'Diamond', 'Square'],
+  ['Oblong', 'Square', 'Heart'],
 ] as const;
 
 const OCCASION_SETS = [

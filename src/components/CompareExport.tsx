@@ -80,7 +80,7 @@ export function generateCompareCollage(looks: SavedLook[]): string | null {
   });
 
   // SpectaSnap watermark
-  ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
+  ctx.font = '500 11px Inter, system-ui, sans-serif';
   ctx.fillStyle = 'rgba(201,169,110,0.7)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';

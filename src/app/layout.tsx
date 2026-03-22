@@ -1,6 +1,22 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, Cormorant_Garamond } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  variable: '--font-cormorant-garamond',
+  display: 'swap',
+  weight: ['400', '600'],
+  style: ['normal', 'italic'],
+});
 
 const SITE_URL = 'https://spectasnap-orpin.vercel.app';
 
@@ -31,15 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap"
-        />
-      </head>
+    <html lang="en" className={`${inter.variable} ${cormorant.variable}`}>
       <body>
         {children}
         <Analytics />

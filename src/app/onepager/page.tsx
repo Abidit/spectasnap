@@ -14,7 +14,7 @@ export default function OnepagerPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-white" style={{ fontFamily: 'DM Sans, system-ui, sans-serif', color: '#1A1612' }}>
+      <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif', color: '#1A1612' }}>
         {/* Print button */}
         <div className="no-print fixed top-4 right-4 z-10">
           <button

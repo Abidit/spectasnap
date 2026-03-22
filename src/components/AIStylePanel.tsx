@@ -81,7 +81,6 @@ function AIStylePanelImpl({ open, onClose, availableFrames, onRecommendation }: 
       Square:  { frameId: 'featured-round', frameName: 'Featured Round', rationale: 'Round frames soften strong jawlines and add a refined, balanced look to square faces.' },
       Heart:   { frameId: 'cat-eye-01', frameName: 'Cat-Eye 01', rationale: 'Cat-eye frames balance a wider forehead and draw attention to your eyes beautifully.' },
       Oblong:  { frameId: 'featured-wayfarer', frameName: 'Featured Wayfarer', rationale: 'Wayfarer frames add width and proportion to longer face shapes for a flattering fit.' },
-      Diamond: { frameId: 'featured-cat-eye', frameName: 'Featured Cat-Eye', rationale: 'Cat-eye frames highlight your cheekbones and complement the unique angles of a diamond face.' },
     };
     return fallbacks[shape] ?? fallbacks.Oval;
   }
@@ -195,7 +194,7 @@ function AIStylePanelImpl({ open, onClose, availableFrames, onRecommendation }: 
                     <h3 className="font-serif text-2xl font-semibold text-brand-text mb-1">Your face shape?</h3>
                     <p className="text-brand-muted text-xs font-sans mb-5">Not sure? Pick what feels closest</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {['Oval', 'Round', 'Square', 'Heart', 'Oblong', 'Diamond'].map((s) => (
+                      {['Oval', 'Round', 'Square', 'Heart', 'Oblong'].map((s) => (
                         <OptionButton
                           key={s}
                           label={s}
