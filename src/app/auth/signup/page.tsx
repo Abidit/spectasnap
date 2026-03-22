@@ -2,15 +2,46 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function SignupPage() {
+  const router = useRouter();
+  const [name, setName] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [city, setCity] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    // Supabase integration deferred — stub
-    setTimeout(() => setLoading(false), 1000);
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          store_name: storeName,
+          full_name: name,
+          city,
+        },
+      },
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    router.push('/auth/verify?email=' + encodeURIComponent(email));
   }
 
   return (
@@ -35,6 +66,8 @@ export default function SignupPage() {
               <input
                 type="text"
                 required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
                            focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                 style={{ borderRadius: 2 }}
@@ -49,6 +82,8 @@ export default function SignupPage() {
               <input
                 type="text"
                 required
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
                 className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
                            focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                 style={{ borderRadius: 2 }}
@@ -63,6 +98,8 @@ export default function SignupPage() {
               <input
                 type="email"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
                            focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                 style={{ borderRadius: 2 }}
@@ -78,12 +115,33 @@ export default function SignupPage() {
                 type="password"
                 required
                 minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
                            focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                 style={{ borderRadius: 2 }}
                 placeholder="Min. 8 characters"
               />
             </div>
+
+            <div>
+              <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
+                City
+              </label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
+                           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                style={{ borderRadius: 2 }}
+                placeholder="Mumbai"
+              />
+            </div>
+
+            {error && (
+              <p className="text-xs font-sans text-red-400 -mt-2">{error}</p>
+            )}
 
             <button
               type="submit"
@@ -102,6 +160,12 @@ export default function SignupPage() {
               Sign in
             </Link>
           </p>
+
+          {!SUPABASE_CONFIGURED && (
+            <p className="text-xs text-ink-300 text-center mt-4 font-sans">
+              Auth not configured — running in demo mode
+            </p>
+          )}
         </div>
       </div>
     </div>

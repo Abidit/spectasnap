@@ -2,19 +2,34 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function ResetPasswordPage() {
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    // Supabase integration deferred — stub
-    setTimeout(() => {
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/auth/new-password',
+    });
+
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
-      setSent(true);
-    }, 1000);
+      return;
+    }
+
+    setLoading(false);
+    setSent(true);
   }
 
   return (
@@ -59,12 +74,18 @@ export default function ResetPasswordPage() {
                   <input
                     type="email"
                     required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
                                focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                     style={{ borderRadius: 2 }}
                     placeholder="you@storename.com"
                   />
                 </div>
+
+                {error && (
+                  <p className="text-xs font-sans text-red-400 -mt-2">{error}</p>
+                )}
 
                 <button
                   type="submit"
@@ -82,6 +103,12 @@ export default function ResetPasswordPage() {
                   Back to sign in
                 </Link>
               </p>
+
+              {!SUPABASE_CONFIGURED && (
+                <p className="text-xs text-ink-300 text-center mt-4 font-sans">
+                  Auth not configured — running in demo mode
+                </p>
+              )}
             </>
           )}
         </div>

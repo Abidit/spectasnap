@@ -2,24 +2,48 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function NewPasswordPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError('');
+
     const form = e.currentTarget;
-    const pw = (form.elements.namedItem('password') as HTMLInputElement).value;
+    const newPassword = (form.elements.namedItem('password') as HTMLInputElement).value;
     const confirm = (form.elements.namedItem('confirm') as HTMLInputElement).value;
-    if (pw !== confirm) return;
+
+    if (newPassword !== confirm) {
+      setError("Passwords don't match");
+      return;
+    }
 
     setLoading(true);
-    // Supabase integration deferred — stub
-    setTimeout(() => {
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
-      setDone(true);
-    }, 1000);
+      return;
+    }
+
+    setLoading(false);
+    setDone(true);
+
+    // Redirect to dashboard after a short delay
+    setTimeout(() => {
+      router.push('/dashboard');
+    }, 2000);
   }
 
   return (
@@ -42,7 +66,7 @@ export default function NewPasswordPage() {
                 Password Updated
               </p>
               <p className="text-sm font-sans text-ink-500 leading-relaxed mb-4">
-                Your password has been changed successfully.
+                Your password has been changed successfully. Redirecting&hellip;
               </p>
               <Link
                 href="/auth/login"
@@ -87,6 +111,10 @@ export default function NewPasswordPage() {
                 />
               </div>
 
+              {error && (
+                <p className="text-xs font-sans text-red-400 -mt-2">{error}</p>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -96,6 +124,12 @@ export default function NewPasswordPage() {
               >
                 {loading ? 'Updating…' : 'Set New Password'}
               </button>
+
+              {!SUPABASE_CONFIGURED && (
+                <p className="text-xs text-ink-300 text-center font-sans">
+                  Auth not configured — running in demo mode
+                </p>
+              )}
             </form>
           )}
         </div>
