@@ -141,7 +141,7 @@ export function initThreeOverlay(containerEl: HTMLElement): HTMLCanvasElement {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.15;
 
   const w = containerEl.clientWidth;
   const h = containerEl.clientHeight;

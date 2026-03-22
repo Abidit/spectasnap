@@ -12,6 +12,7 @@ import { drawPDOverlay } from '@/ar/pdOverlay';
 import type { ColorVariant } from '@/lib/glasses-data';
 import type { LensTint } from '@/ar/presets';
 import { loadCustomFrame } from '@/ar/customFrameLoader';
+import { updateGlassesGlare } from '@/ar/proceduralGlasses';
 import type { ARStatusKind } from '@/components/ar/ARStatusBadge';
 import { createGlassesDetector, type GlassesDetector } from '@/ar/glassesDetector';
 import { inpaintGlasses } from '@/ar/inpaint';
@@ -262,6 +263,9 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
 
           if (fi === 0) {
             threeSceneRef.current?.animateGLBTemples(landmarks, smoothed, canvas.width, canvas.height);
+            // Update glare position with head pose for realistic glass sheen
+            const activeModel = threeSceneRef.current?.getActiveModel?.();
+            if (activeModel) updateGlassesGlare(activeModel, smoothed.yaw, smoothed.pitch);
           }
 
           // Yaw fade

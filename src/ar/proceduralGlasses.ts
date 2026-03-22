@@ -15,33 +15,40 @@ interface LensMaterialConfig {
   ior: number;
   opacity: number;
   envMapIntensity: number;
+  specularIntensity: number;
+  specularColor: number;
 }
 
 const LENS_PRESETS: Record<string, LensMaterialConfig> = {
   default: {
-    color: 0x88aacc, metalness: 0.0, roughness: 0.05,
-    transmission: 0.92, thickness: 0.5, ior: 1.5,
-    opacity: 0.22, envMapIntensity: 1.2, // Clean build: unified lens opacity
+    color: 0x88aacc, metalness: 0.0, roughness: 0.03,
+    transmission: 0.92, thickness: 0.5, ior: 1.52,
+    opacity: 0.22, envMapIntensity: 2.0,
+    specularIntensity: 1.0, specularColor: 0xffffff,
   },
   dark: {
-    color: 0x111111, metalness: 0.0, roughness: 0.08,
-    transmission: 0.35, thickness: 0.5, ior: 1.5,
-    opacity: 0.65, envMapIntensity: 1.2, // Dark tint stays heavier
+    color: 0x111111, metalness: 0.0, roughness: 0.05,
+    transmission: 0.35, thickness: 0.5, ior: 1.52,
+    opacity: 0.65, envMapIntensity: 2.0,
+    specularIntensity: 1.0, specularColor: 0xffffff,
   },
   gold: {
-    color: 0xc9a96e, metalness: 0.3, roughness: 0.05,
-    transmission: 0.45, thickness: 0.5, ior: 1.5,
-    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.55
+    color: 0xc9a96e, metalness: 0.3, roughness: 0.04,
+    transmission: 0.45, thickness: 0.5, ior: 1.52,
+    opacity: 0.22, envMapIntensity: 2.2,
+    specularIntensity: 1.0, specularColor: 0xfff8e0,
   },
   clear: {
-    color: 0xccddee, metalness: 0.0, roughness: 0.02,
-    transmission: 0.96, thickness: 0.5, ior: 1.5,
-    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.08
+    color: 0xccddee, metalness: 0.0, roughness: 0.01,
+    transmission: 0.96, thickness: 0.5, ior: 1.52,
+    opacity: 0.22, envMapIntensity: 2.4,
+    specularIntensity: 1.0, specularColor: 0xffffff,
   },
   rose: {
-    color: 0xc4826a, metalness: 0.0, roughness: 0.06,
-    transmission: 0.5, thickness: 0.5, ior: 1.5,
-    opacity: 0.22, envMapIntensity: 1.2, // Clean build: was 0.5
+    color: 0xc4826a, metalness: 0.0, roughness: 0.04,
+    transmission: 0.5, thickness: 0.5, ior: 1.52,
+    opacity: 0.22, envMapIntensity: 2.0,
+    specularIntensity: 1.0, specularColor: 0xffe8e0,
   },
 };
 
@@ -67,6 +74,8 @@ function createLensMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMateria
     transparent: true,
     opacity: cfg.opacity,
     envMapIntensity: cfg.envMapIntensity,
+    specularIntensity: cfg.specularIntensity,
+    specularColor: new THREE.Color(cfg.specularColor),
     side: THREE.DoubleSide,
     depthWrite: false,
     // AR coating support (Task 8.2) — initialized off, toggled by setLensCoating()
@@ -86,19 +95,22 @@ function createFrameMaterial(preset: ProceduralPreset): THREE.MeshPhysicalMateri
     return new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(preset.frameColor),
       metalness: 0.95,
-      roughness: 0.15,
+      roughness: 0.12,
       reflectivity: 1.0,
-      envMapIntensity: 1.4,
+      envMapIntensity: 1.8,
     });
   }
   // Acetate: round, rectangle, cat-eye
   return new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(preset.frameColor),
     clearcoat: 1.0,
-    clearcoatRoughness: 0.1,
-    roughness: 0.35,
+    clearcoatRoughness: 0.08,
+    roughness: 0.3,
     metalness: 0.05,
-    envMapIntensity: 0.8,
+    envMapIntensity: 1.0,
+    sheen: 0.15,
+    sheenRoughness: 0.4,
+    sheenColor: new THREE.Color(preset.frameColor).multiplyScalar(1.3),
   });
 }
 
@@ -147,6 +159,27 @@ function makeLensShape(preset: ProceduralPreset): THREE.Shape {
   shape.bezierCurveTo(w * 0.98, -h * 0.62, w * 0.3, -h, -w * 0.54, -h * 0.83);
   shape.bezierCurveTo(-w * 0.8, -h * 0.75, -w * 0.95, -h * 0.55, -w * 0.96, -h * 0.15);
   return shape;
+}
+
+// ---------------------------------------------------------------------------
+// Lens extrude geometry — gives lenses physical depth + bevel catchlights
+// ---------------------------------------------------------------------------
+
+function buildLensGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
+  const shape = makeLensShape({
+    ...preset,
+    lensWidth: Math.max(0.01, preset.lensWidth - preset.rimThickness * 1.1),
+    lensHeight: Math.max(0.01, preset.lensHeight - preset.rimThickness * 1.1),
+  });
+  return new THREE.ExtrudeGeometry(shape, {
+    depth: 0.004,
+    bevelEnabled: true,
+    bevelSize: 0.0008,
+    bevelThickness: 0.001,
+    bevelSegments: 3,
+    curveSegments: 20,
+    steps: 1,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -202,49 +235,69 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   group.add(rightRim);
 
   // ── Lenses ─────────────────────────────────────────────────────────────────
-  const lensShape = makeLensShape({
-    ...preset,
-    lensWidth: Math.max(0.01, preset.lensWidth - preset.rimThickness * 1.1),
-    lensHeight: Math.max(0.01, preset.lensHeight - preset.rimThickness * 1.1),
-  });
-  const lensGeo = new THREE.ShapeGeometry(lensShape, 20);
+  const lensGeo = buildLensGeometry(preset);
 
   const leftLens = new THREE.Mesh(lensGeo, lensMat);
-  leftLens.position.set(-halfIPD, 0, lensZ);
+  leftLens.position.set(-halfIPD, 0, lensZ - 0.002);
   leftLens.userData.role = 'lens';
   group.add(leftLens);
 
   const rightLens = new THREE.Mesh(lensGeo, lensMat);
-  rightLens.position.set(halfIPD, 0, lensZ);
+  rightLens.position.set(halfIPD, 0, lensZ - 0.002);
   rightLens.userData.role = 'lens';
   group.add(rightLens);
 
-  // ── Lens glare highlights (Task 6) ─────────────────────────────────────────
+  // ── Lens glare highlights — proportional to lens size ──────────────────────
+  const gw = preset.lensWidth * 0.55;
+  const gh = preset.lensHeight * 0.22;
   const glareShape = new THREE.Shape();
-  glareShape.moveTo(-0.018, 0.012);
-  glareShape.quadraticCurveTo(-0.008, 0.022, 0.005, 0.018);
-  glareShape.quadraticCurveTo(0.002, 0.008, -0.018, 0.012);
+  glareShape.moveTo(-gw, gh * 0.3);
+  glareShape.quadraticCurveTo(-gw * 0.2, gh, gw * 0.4, gh * 0.7);
+  glareShape.quadraticCurveTo(gw * 0.3, gh * 0.1, -gw, gh * 0.3);
 
   const glareGeo = new THREE.ShapeGeometry(glareShape);
   const glareMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.18,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
   });
 
   const leftGlare = new THREE.Mesh(glareGeo, glareMat);
-  leftGlare.position.set(-halfIPD, preset.lensHeight * 0.15, lensZ + 0.001);
+  leftGlare.position.set(-halfIPD, preset.lensHeight * 0.18, lensZ + 0.005);
   leftGlare.userData.role = 'glare';
   group.add(leftGlare);
 
   const rightGlare = new THREE.Mesh(glareGeo, glareMat);
-  rightGlare.position.set(halfIPD, preset.lensHeight * 0.15, lensZ + 0.001);
+  rightGlare.position.set(halfIPD, preset.lensHeight * 0.18, lensZ + 0.005);
   rightGlare.scale.x = -1; // Mirror for right lens
   rightGlare.userData.role = 'glare';
   group.add(rightGlare);
+
+  // Secondary micro-glare — small bright catchlight dot
+  const dotShape = new THREE.Shape();
+  dotShape.absellipse(0, 0, preset.lensWidth * 0.08, preset.lensHeight * 0.06, 0, Math.PI * 2, false, 0);
+  const dotGeo = new THREE.ShapeGeometry(dotShape, 8);
+  const dotMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+
+  const leftDot = new THREE.Mesh(dotGeo, dotMat);
+  leftDot.position.set(-halfIPD - preset.lensWidth * 0.25, preset.lensHeight * 0.35, lensZ + 0.006);
+  leftDot.userData.role = 'glare';
+  group.add(leftDot);
+
+  const rightDot = new THREE.Mesh(dotGeo, dotMat);
+  rightDot.position.set(halfIPD + preset.lensWidth * 0.25, preset.lensHeight * 0.35, lensZ + 0.006);
+  rightDot.userData.role = 'glare';
+  group.add(rightDot);
 
   // ── Bridge ─────────────────────────────────────────────────────────────────
   const bridgeGeo = new THREE.BoxGeometry(
@@ -299,6 +352,37 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
  * Uses userData.role tags to distinguish mesh types, allowing both frame and
  * lens materials to be MeshPhysicalMaterial.
  */
+/**
+ * Animate glare highlights with head pose — call each frame from ARCamera
+ * after applyFaceTransform() to make glass look alive as the head rotates.
+ *
+ * @param model  THREE.Group from createProceduralGlasses()
+ * @param yaw    Horizontal head rotation in radians (from FaceTransform)
+ * @param pitch  Vertical head rotation in radians (from FaceTransform)
+ */
+export function updateGlassesGlare(
+  model: THREE.Group,
+  yaw: number,
+  pitch: number,
+): void {
+  const glareX = THREE.MathUtils.clamp(yaw * 0.04, -0.012, 0.012);
+  const glareY = THREE.MathUtils.clamp(pitch * 0.03, -0.008, 0.008);
+
+  model.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'glare') return;
+
+    obj.position.x += glareX;
+    obj.position.y += glareY;
+
+    // Fade glare at extreme yaw angles (lens turns away from light source)
+    const mat = obj.material as THREE.MeshBasicMaterial;
+    const base = (mat.userData.baseOpacity as number | undefined) ?? mat.opacity;
+    if (!mat.userData.baseOpacity) mat.userData.baseOpacity = mat.opacity;
+    mat.opacity = base * Math.max(0, 1 - Math.abs(yaw) * 1.5);
+    mat.needsUpdate = true;
+  });
+}
+
 export function updateGlassesColor(
   model: THREE.Group,
   frameHex: string,
