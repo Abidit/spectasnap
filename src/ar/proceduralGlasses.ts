@@ -41,7 +41,7 @@ const LENS_PRESETS: Record<string, LensMaterialConfig> = {
   clear: {
     color: 0xccddee, metalness: 0.0, roughness: 0.01,
     transmission: 0.96, thickness: 0.5, ior: 1.52,
-    opacity: 0.22, envMapIntensity: 2.4,
+    opacity: 0.08, envMapIntensity: 2.4,
     specularIntensity: 1.0, specularColor: 0xffffff,
   },
   rose: {
@@ -344,14 +344,9 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
 }
 
 // ---------------------------------------------------------------------------
-// updateGlassesColor — uses userData.role instead of instanceof (Task 3)
+// updateGlassesGlare — animate glare with head pose each frame
 // ---------------------------------------------------------------------------
 
-/**
- * Update the frame and lens colors of a procedural glasses model in-place.
- * Uses userData.role tags to distinguish mesh types, allowing both frame and
- * lens materials to be MeshPhysicalMaterial.
- */
 /**
  * Animate glare highlights with head pose — call each frame from ARCamera
  * after applyFaceTransform() to make glass look alive as the head rotates.
@@ -371,18 +366,35 @@ export function updateGlassesGlare(
   model.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh) || obj.userData.role !== 'glare') return;
 
-    obj.position.x += glareX;
-    obj.position.y += glareY;
+    // Snapshot the original spawn position once — never overwrite it
+    if (obj.userData.baseX === undefined) {
+      obj.userData.baseX = obj.position.x;
+      obj.userData.baseY = obj.position.y;
+    }
+
+    // SET position relative to base, never accumulate
+    obj.position.x = (obj.userData.baseX as number) + glareX;
+    obj.position.y = (obj.userData.baseY as number) + glareY;
 
     // Fade glare at extreme yaw angles (lens turns away from light source)
     const mat = obj.material as THREE.MeshBasicMaterial;
-    const base = (mat.userData.baseOpacity as number | undefined) ?? mat.opacity;
-    if (!mat.userData.baseOpacity) mat.userData.baseOpacity = mat.opacity;
-    mat.opacity = base * Math.max(0, 1 - Math.abs(yaw) * 1.5);
+    if (mat.userData.baseOpacity === undefined) {
+      mat.userData.baseOpacity = mat.opacity;
+    }
+    mat.opacity = (mat.userData.baseOpacity as number) * Math.max(0, 1 - Math.abs(yaw) * 1.5);
     mat.needsUpdate = true;
   });
 }
 
+// ---------------------------------------------------------------------------
+// updateGlassesColor — uses userData.role instead of instanceof
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the frame and lens colors of a procedural glasses model in-place.
+ * Uses userData.role tags to distinguish mesh types, allowing both frame and
+ * lens materials to be MeshPhysicalMaterial.
+ */
 export function updateGlassesColor(
   model: THREE.Group,
   frameHex: string,
