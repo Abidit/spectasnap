@@ -1,29 +1,95 @@
-import { Check } from 'lucide-react';
+'use client'
+
+import { useState } from 'react'
+import { Check } from 'lucide-react'
+
+const FEATURES = [
+  'Real-time 3D AR try-on (60fps)',
+  'All 50+ frame styles',
+  'Custom frame upload',
+  'Staff note & branding',
+  'QR code share page',
+  'Session analytics',
+  'PD measurement tool',
+  'Unlimited customers',
+  'WhatsApp & share integration',
+  'Dedicated onboarding call',
+]
+
+const MONTHLY_PRICE = 2999
+const ANNUAL_PRICE = Math.round(MONTHLY_PRICE * 0.8)
 
 export default function PricingPage() {
-  const features = [
-    'Real-time 3D AR try-on (60fps)',
-    'All 50+ frame styles',
-    'Custom frame upload',
-    'Staff note & branding',
-    'QR code share page',
-    'Session analytics',
-    'PD measurement tool',
-    'Unlimited customers',
-    'WhatsApp & share integration',
-    'Dedicated onboarding call',
-  ];
+  const [isAnnual, setIsAnnual] = useState(false)
+  const price = isAnnual ? ANNUAL_PRICE : MONTHLY_PRICE
 
   return (
     <div className="min-h-screen bg-cream-100 flex flex-col items-center justify-center p-8">
       {/* Logo */}
-      <div className="mb-12 text-center">
+      <div className="mb-10 text-center">
         <p className="font-serif text-2xl font-semibold text-ink-900">
           Specta<em style={{ color: '#C9A96E' }}>Snap</em>
         </p>
         <p className="text-xs font-sans tracking-widest uppercase text-ink-300 mt-1">
           AR Try-On Platform
         </p>
+      </div>
+
+      {/* Billing toggle — single row */}
+      <div className="flex items-center gap-3 mb-8">
+        <span
+          className="text-sm font-sans font-medium"
+          style={{ color: isAnnual ? '#9A9490' : '#1A1612' }}
+        >
+          Monthly
+        </span>
+
+        <button
+          role="switch"
+          aria-checked={isAnnual}
+          onClick={() => setIsAnnual(v => !v)}
+          style={{
+            borderRadius: 999,
+            width: 44,
+            height: 24,
+            backgroundColor: isAnnual ? '#C9A96E' : '#DDD8CE',
+            position: 'relative',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              position: 'absolute',
+              top: 3,
+              left: isAnnual ? 23 : 3,
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              backgroundColor: '#FDFAF4',
+              transition: 'left 0.2s',
+              display: 'block',
+            }}
+          />
+        </button>
+
+        <span
+          className="text-sm font-sans font-medium"
+          style={{ color: isAnnual ? '#1A1612' : '#9A9490' }}
+        >
+          Annual
+        </span>
+
+        {isAnnual && (
+          <span
+            className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] px-2 py-0.5"
+            style={{ borderRadius: 2, backgroundColor: '#F7EDD8', color: '#A8844A' }}
+          >
+            Save 20%
+          </span>
+        )}
       </div>
 
       {/* Pricing card */}
@@ -39,9 +105,16 @@ export default function PricingPage() {
           Optical Store Plan
         </p>
         <h1 className="font-serif text-3xl font-semibold text-ink-900 leading-tight">
-          ₹2,999
-          <span className="text-base font-sans font-normal text-ink-500 ml-1">/month</span>
+          ₹{price.toLocaleString('en-IN')}
+          <span className="text-base font-sans font-normal text-ink-500 ml-1">
+            /{isAnnual ? 'mo, billed annually' : 'month'}
+          </span>
         </h1>
+        {isAnnual && (
+          <p className="text-xs font-sans text-ink-300 mt-1">
+            ₹{(ANNUAL_PRICE * 12).toLocaleString('en-IN')} per year
+          </p>
+        )}
         <p className="text-ink-500 text-sm font-sans mt-2">
           Everything you need to offer real-time AR try-on to your customers — no app install required.
         </p>
@@ -51,7 +124,7 @@ export default function PricingPage() {
 
         {/* Features */}
         <ul className="flex flex-col gap-3 mb-8">
-          {features.map((feature) => (
+          {FEATURES.map(feature => (
             <li key={feature} className="flex items-start gap-3">
               <span
                 className="flex-shrink-0 w-4 h-4 mt-0.5 flex items-center justify-center"
@@ -89,5 +162,5 @@ export default function PricingPage() {
         </a>
       </p>
     </div>
-  );
+  )
 }
