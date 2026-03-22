@@ -5,7 +5,7 @@
  * on top of the mirrored video frame. Called every frame from the render
  * loop in ARCamera when PD measuring is active.
  *
- * Design tokens: brand-gold (#C9A96E), DM Sans, lightweight for 60fps.
+ * Design tokens: brand-gold (#C9A96E), Inter, lightweight for 60fps.
  */
 
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
@@ -83,7 +83,7 @@ export function drawPDOverlay(
     const fontSize = Math.max(14, Math.round(canvasW * 0.018));
     ctx.globalAlpha = TEXT_OPACITY;
     ctx.fillStyle = GOLD;
-    ctx.font = `600 ${fontSize}px "DM Sans", system-ui, sans-serif`;
+    ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 

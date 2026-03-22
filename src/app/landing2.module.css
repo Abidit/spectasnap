@@ -11,7 +11,7 @@
   --white:  #FDFAF4;
   --border: #DDD8CE;
 
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-inter), sans-serif;
   background: var(--bg);
   color: var(--ink);
   overflow-x: hidden;
@@ -74,7 +74,7 @@
 .heroActions { display: flex; gap: 12px; flex-wrap: wrap; }
 .btnPrimary {
   padding: 14px 28px; background: var(--ink); color: var(--white);
-  border: none; border-radius: 2px; font-family: 'DM Sans', sans-serif;
+  border: none; border-radius: 2px; font-family: var(--font-inter), sans-serif;
   font-size: 0.88rem; font-weight: 600; cursor: pointer;
   transition: background 0.2s; text-decoration: none; display: inline-block;
 }
@@ -82,7 +82,7 @@
 .btnGhost {
   padding: 14px 28px; background: transparent; color: var(--ink);
   border: 1px solid var(--border); border-radius: 2px;
-  font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 500;
+  font-family: var(--font-inter), sans-serif; font-size: 0.88rem; font-weight: 500;
   cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block;
 }
 .btnGhost:hover { border-color: var(--ink); }
@@ -114,7 +114,7 @@
 .heroVisualTry {
   margin-top: 24px; padding: 11px 24px; background: var(--gold);
   color: var(--ink); border: none; border-radius: 2px;
-  font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 600;
+  font-family: var(--font-inter), sans-serif; font-size: 0.82rem; font-weight: 600;
   cursor: pointer; transition: background 0.2s;
 }
 .heroVisualTry:hover { background: var(--gold2); color: var(--white); }
@@ -245,7 +245,7 @@
   margin-top: 32px; display: inline-block; padding: 14px 36px;
   background: var(--gold); color: var(--ink); border-radius: 2px;
   font-weight: 600; font-size: 0.88rem; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; transition: background 0.2s;
+  font-family: var(--font-inter), sans-serif; transition: background 0.2s;
   text-decoration: none;
 }
 .demoTryBtn:hover { background: var(--gold2); color: var(--white); }
@@ -307,7 +307,7 @@
 }
 .formField input {
   padding: 12px 14px; border: 1px solid var(--border); border-radius: 2px;
-  background: var(--bg); font-family: 'DM Sans', sans-serif;
+  background: var(--bg); font-family: var(--font-inter), sans-serif;
   font-size: 0.85rem; color: var(--ink); outline: none;
   transition: border-color 0.2s; width: 100%;
 }
@@ -315,7 +315,7 @@
 .formField input::placeholder { color: var(--ink3); }
 .formSubmit {
   width: 100%; padding: 15px; background: var(--ink); color: var(--white);
-  border: none; border-radius: 2px; font-family: 'DM Sans', sans-serif;
+  border: none; border-radius: 2px; font-family: var(--font-inter), sans-serif;
   font-size: 0.9rem; font-weight: 600; cursor: pointer;
   transition: background 0.2s; margin-top: 4px;
 }

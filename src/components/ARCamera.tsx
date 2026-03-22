@@ -483,7 +483,7 @@ export default function ARCamera({ selectedGlasses, selectedColor, selectedTint,
     // Watermark
     const padding = Math.round(out.width * 0.012);
     const fontSize = Math.round(out.width * 0.018);
-    ctx.font = `600 ${fontSize}px DM Sans, sans-serif`;
+    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
     ctx.fillStyle = 'rgba(201,169,110,0.92)';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
