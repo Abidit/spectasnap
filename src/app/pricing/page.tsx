@@ -216,16 +216,8 @@ export default function PricingPage() {
           Start free. Upgrade when ready.
         </p>
 
-        {/* Monthly / Annual toggle */}
+        {/* Monthly / Annual toggle — single row, labels shown once inside pill */}
         <div className="flex items-center justify-center gap-3 mt-8">
-          <span
-            className="font-sans text-sm font-semibold"
-            style={{ color: isAnnual ? '#9A9490' : '#1A1612' }}
-          >
-            Monthly
-          </span>
-
-          {/* Pill toggle */}
           <div
             className="flex items-center border border-cream-400 rounded-full p-0.5"
             style={{ backgroundColor: '#FDFAF4' }}
@@ -256,15 +248,8 @@ export default function PricingPage() {
             </button>
           </div>
 
-          <span
-            className="font-sans text-sm font-semibold"
-            style={{ color: isAnnual ? '#1A1612' : '#9A9490' }}
-          >
-            Annual
-          </span>
-
           {isAnnual && (
-            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold ml-2">
+            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
               Save 20%
             </span>
           )}
