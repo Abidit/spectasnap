@@ -38,63 +38,245 @@ export default function SignupPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen flex">
-      {/* ── Left panel — hidden on mobile ── */}
-      <div className="hidden lg:flex w-1/2 bg-dark flex-col justify-between p-12">
-        {/* Logo */}
-        <p className="font-serif text-3xl italic text-cream-50">
-          Specta<span style={{ color: '#C9A96E' }}>Snap</span>
-        </p>
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '0 0 10px 0',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '1px solid rgba(255,255,255,0.15)',
+    outline: 'none',
+    fontSize: 14,
+    color: '#FDFAF4',
+    borderRadius: 0,
+    transition: 'border-color 0.15s',
+    boxSizing: 'border-box',
+  };
 
-        {/* Quote */}
-        <div>
-          <p className="font-serif text-4xl italic text-cream-50 leading-tight">
-            Start your free trial today.
-          </p>
-          <p className="font-sans text-sm mt-4" style={{ color: 'rgba(253,250,244,0.4)' }}>
-            Live AR try-on for optical stores.
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: 'rgba(253,250,244,0.5)',
+    marginBottom: 8,
+  };
+
+  return (
+    <div className="min-h-screen flex" style={{ backgroundColor: '#1A1612' }}>
+
+      {/* ── LEFT PANEL ── */}
+      <div
+        className="hidden lg:flex w-1/2 flex-col p-12 relative overflow-hidden"
+        style={{ backgroundColor: '#1A1612' }}
+      >
+        {/* Background ambient glow */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '-20%',
+            left: '-10%',
+            width: '60%',
+            height: '60%',
+            background: 'radial-gradient(ellipse at center, rgba(168,132,74,0.08) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Logo — top left */}
+        <div className="flex-shrink-0 relative z-10">
+          <p className="font-serif text-2xl italic" style={{ color: '#FDFAF4' }}>
+            Specta<span style={{ color: '#C9A96E' }}>Snap</span>
           </p>
         </div>
 
-        {/* Stats */}
-        <p
-          className="font-sans text-xs uppercase tracking-widest"
-          style={{ color: 'rgba(253,250,244,0.2)' }}
-        >
-          50+ frames · 478 landmarks · 60fps
-        </p>
+        {/* Image placeholder — optical store interior */}
+        <div className="flex-1 flex items-center justify-center relative z-10" style={{ margin: '40px 0' }}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              aspectRatio: '4/3',
+              backgroundColor: '#0A0A0A',
+              borderRadius: 2,
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Subtle grid lines suggesting a store interior */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage:
+                  'linear-gradient(rgba(201,169,110,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,169,110,0.04) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+              }}
+            />
+            {/* Perspective shelf lines */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '40%',
+                background: 'linear-gradient(to top, rgba(168,132,74,0.06) 0%, transparent 100%)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '30%',
+                left: '15%',
+                right: '15%',
+                height: 1,
+                backgroundColor: 'rgba(201,169,110,0.12)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '55%',
+                left: '8%',
+                right: '8%',
+                height: 1,
+                backgroundColor: 'rgba(201,169,110,0.08)',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Overlay text — headline + subtext */}
+        <div className="relative z-10" style={{ paddingBottom: 8 }}>
+          <p
+            className="font-serif"
+            style={{
+              fontStyle: 'italic',
+              fontSize: 28,
+              lineHeight: 1.25,
+              color: '#FDFAF4',
+              marginBottom: 16,
+              fontWeight: 500,
+            }}
+          >
+            Curating the future of optical retail.
+          </p>
+          <p
+            className="font-sans"
+            style={{
+              fontSize: 13,
+              lineHeight: 1.65,
+              color: 'rgba(253,250,244,0.45)',
+              marginBottom: 32,
+              maxWidth: 340,
+            }}
+          >
+            Join the exclusive circle of digital curators. Transform your boutique into a high-fidelity virtual showroom.
+          </p>
+
+          {/* Social proof */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Avatar dots */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {['#C9A96E', '#A8844A', '#DDD8CE'].map((color, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    backgroundColor: color,
+                    border: '2px solid #1A1612',
+                    marginLeft: i === 0 ? 0 : -8,
+                    opacity: 0.85,
+                  }}
+                />
+              ))}
+            </div>
+            <p
+              className="font-sans"
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'rgba(253,250,244,0.35)',
+              }}
+            >
+              Trusted by 500+ Luxury Boutiques
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* ── Right panel — form ── */}
-      <div className="flex-1 bg-cream-100 flex items-center justify-center p-8">
-        <div
-          className="bg-cream-50 border border-cream-400 p-8 w-full max-w-sm"
-          style={{ borderRadius: 2 }}
-        >
-          {/* Eyebrow */}
-          <p
-            className="font-sans font-semibold uppercase mb-2"
+      {/* ── RIGHT PANEL ── */}
+      <div
+        className="flex-1 flex items-center justify-center p-8"
+        style={{ backgroundColor: '#F5F0E8' }}
+      >
+        <div className="w-full max-w-sm">
+
+          {/* Heading block */}
+          <h1
+            className="font-serif"
             style={{
-              fontSize: 10,
-              letterSpacing: '0.14em',
-              color: '#A8844A',
+              fontSize: 36,
+              fontWeight: 600,
+              color: '#1A1612',
+              lineHeight: 1.15,
+              marginBottom: 10,
             }}
           >
             Create Account
+          </h1>
+          <p
+            className="font-sans"
+            style={{
+              fontSize: 13,
+              color: '#6B6560',
+              marginBottom: 36,
+              lineHeight: 1.6,
+            }}
+          >
+            Start your journey as a Digital Curator.
           </p>
 
-          {/* Heading */}
-          <h1 className="font-serif text-3xl text-ink-900 mb-1">30-day free trial</h1>
-          <p className="font-sans text-sm text-ink-500 mb-8">No credit card required</p>
+          <form onSubmit={handleSubmit} className="flex flex-col">
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+            {/* Full Name */}
+            <div style={{ marginBottom: 24 }}>
+              <label
+                htmlFor="signup-your-name"
+                className="font-sans"
+                style={{ ...labelStyle, color: '#1A1612' }}
+              >
+                Full Name
+              </label>
+              <input
+                id="signup-your-name"
+                type="text"
+                required
+                value={yourName}
+                onChange={(e) => setYourName(e.target.value)}
+                placeholder="Aditya Shah"
+                className="font-sans"
+                style={{
+                  ...inputStyle,
+                  color: '#1A1612',
+                  borderBottomColor: '#DDD8CE',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderBottomColor = '#A8844A'; }}
+                onBlur={(e) => { e.currentTarget.style.borderBottomColor = '#DDD8CE'; }}
+              />
+            </div>
+
             {/* Store Name */}
-            <div className="mb-4">
+            <div style={{ marginBottom: 24 }}>
               <label
                 htmlFor="signup-store-name"
-                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
-                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+                className="font-sans"
+                style={{ ...labelStyle, color: '#1A1612' }}
               >
                 Store Name
               </label>
@@ -104,41 +286,26 @@ export default function SignupPage() {
                 required
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
-                style={{ borderRadius: 2 }}
                 placeholder="Shah Opticals"
+                className="font-sans"
+                style={{
+                  ...inputStyle,
+                  color: '#1A1612',
+                  borderBottomColor: '#DDD8CE',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderBottomColor = '#A8844A'; }}
+                onBlur={(e) => { e.currentTarget.style.borderBottomColor = '#DDD8CE'; }}
               />
             </div>
 
-            {/* Your Name */}
-            <div className="mb-4">
-              <label
-                htmlFor="signup-your-name"
-                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
-                style={{ fontSize: 12, letterSpacing: '0.1em' }}
-              >
-                Your Name
-              </label>
-              <input
-                id="signup-your-name"
-                type="text"
-                required
-                value={yourName}
-                onChange={(e) => setYourName(e.target.value)}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
-                style={{ borderRadius: 2 }}
-                placeholder="Aditya Shah"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="mb-4">
+            {/* Work Email */}
+            <div style={{ marginBottom: 24 }}>
               <label
                 htmlFor="signup-email"
-                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
-                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+                className="font-sans"
+                style={{ ...labelStyle, color: '#1A1612' }}
               >
-                Email
+                Work Email
               </label>
               <input
                 id="signup-email"
@@ -146,20 +313,26 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
-                style={{ borderRadius: 2 }}
                 placeholder="you@store.com"
+                className="font-sans"
+                style={{
+                  ...inputStyle,
+                  color: '#1A1612',
+                  borderBottomColor: '#DDD8CE',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderBottomColor = '#A8844A'; }}
+                onBlur={(e) => { e.currentTarget.style.borderBottomColor = '#DDD8CE'; }}
               />
             </div>
 
             {/* Password */}
-            <div className="mb-4">
+            <div style={{ marginBottom: 24 }}>
               <label
                 htmlFor="signup-password"
-                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
-                style={{ fontSize: 12, letterSpacing: '0.1em' }}
+                className="font-sans"
+                style={{ ...labelStyle, color: '#1A1612' }}
               >
-                Password
+                Create Password
               </label>
               <input
                 id="signup-password"
@@ -168,94 +341,132 @@ export default function SignupPage() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
-                style={{ borderRadius: 2 }}
                 placeholder="Min. 8 characters"
+                className="font-sans"
+                style={{
+                  ...inputStyle,
+                  color: '#1A1612',
+                  borderBottomColor: '#DDD8CE',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderBottomColor = '#A8844A'; }}
+                onBlur={(e) => { e.currentTarget.style.borderBottomColor = '#DDD8CE'; }}
               />
             </div>
 
-            {/* City */}
-            <div className="mb-4">
-              <label
-                htmlFor="signup-city"
-                className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
-                style={{ fontSize: 12, letterSpacing: '0.1em' }}
-              >
-                City
-              </label>
-              <input
-                id="signup-city"
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
-                style={{ borderRadius: 2 }}
-                placeholder="Mumbai"
-              />
-            </div>
+            {/* City (hidden field, kept for data) */}
+            <input
+              type="hidden"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+            />
 
             {/* Terms */}
-            <label className="flex items-start gap-2.5 mb-6 cursor-pointer">
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                marginBottom: 28,
+                cursor: 'pointer',
+              }}
+            >
               <input
                 type="checkbox"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-0.5 accent-gold-500 flex-shrink-0"
-                style={{ borderRadius: 2 }}
+                className="accent-gold-500 flex-shrink-0"
+                style={{ marginTop: 2, borderRadius: 2 }}
               />
-              <span className="font-sans text-xs text-ink-500 leading-relaxed">
+              <span className="font-sans" style={{ fontSize: 12, color: '#6B6560', lineHeight: 1.5 }}>
                 I agree to the{' '}
-                <Link href="/terms" className="text-gold-600 hover:underline font-semibold">
+                <Link href="/terms" style={{ color: '#A8844A', fontWeight: 700, textDecoration: 'none' }}>
                   Terms of Service
                 </Link>
               </span>
             </label>
 
-            {/* Submit */}
+            {/* Error message */}
+            {error && (
+              <p className="font-sans" style={{ fontSize: 12, color: '#c0392b', marginBottom: 12 }}>
+                {error}
+              </p>
+            )}
+
+            {/* Submit button */}
             <button
               type="submit"
               disabled={loading || !agreed}
-              className="w-full py-3 font-sans font-semibold text-sm bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-50 transition-opacity"
-              style={{ borderRadius: 2, minHeight: 44 }}
+              className="font-sans"
+              style={{
+                width: '100%',
+                padding: '14px 0',
+                backgroundColor: '#1A1612',
+                color: '#FDFAF4',
+                border: 'none',
+                borderRadius: 2,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                cursor: loading || !agreed ? 'not-allowed' : 'pointer',
+                opacity: loading || !agreed ? 0.5 : 1,
+                transition: 'opacity 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                minHeight: 48,
+              }}
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
+                <>
                   <svg
-                    className="animate-spin h-4 w-4 text-cream-50"
+                    className="animate-spin"
+                    style={{ width: 16, height: 16 }}
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                   >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8H4z"
-                    />
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
                   Creating account&hellip;
-                </span>
+                </>
               ) : (
-                'Create my store \u2192'
+                'Create Account \u2192'
               )}
             </button>
           </form>
 
           {/* Footer */}
-          <p className="text-center font-sans text-xs text-ink-500 mt-5">
+          <p
+            className="font-sans"
+            style={{
+              textAlign: 'center',
+              fontSize: 12,
+              color: '#6B6560',
+              marginTop: 28,
+            }}
+          >
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-gold-600 hover:underline font-semibold">
-              Sign in
+            <Link
+              href="/auth/login"
+              style={{
+                color: '#A8844A',
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              Login
             </Link>
           </p>
+
+          {!SUPABASE_CONFIGURED && (
+            <p className="font-sans" style={{ fontSize: 11, color: '#9A9490', textAlign: 'center', marginTop: 16 }}>
+              Auth not configured — running in demo mode
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -116,8 +116,8 @@ export default function PricingPage() {
   }
 
   // Prices per month (annual vs monthly)
-  const proPriceMonthly = isAnnual ? '$39' : '$49';
-  const bizPriceMonthly = isAnnual ? '$79' : '$99';
+  const proPriceMonthly = isAnnual ? '$119' : '$149';
+  const bizPriceMonthly = isAnnual ? '$399' : '$499';
 
   const starterFeatures: Feature[] = [
     { text: 'Live AR try-on', included: true },
@@ -216,19 +216,23 @@ export default function PricingPage() {
           Start free. Upgrade when ready.
         </p>
 
-        {/* Monthly / Annual toggle — single row, labels shown once inside pill */}
+        {/* Monthly / Annual toggle */}
         <div className="flex items-center justify-center gap-3 mt-8">
           <div
-            className="flex items-center border border-cream-400 rounded-full p-0.5"
-            style={{ backgroundColor: '#FDFAF4' }}
+            className="flex border border-cream-400 p-0.5"
+            style={{ borderRadius: 2, backgroundColor: '#FDFAF4' }}
           >
             <button
               type="button"
               onClick={() => setIsAnnual(false)}
-              className="px-4 py-1.5 text-xs font-semibold rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+              className="font-sans font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
               style={{
+                borderRadius: 2,
                 backgroundColor: !isAnnual ? '#1A1612' : 'transparent',
                 color: !isAnnual ? '#FDFAF4' : '#6B6560',
+                padding: '8px 20px',
+                fontSize: 12,
+                fontWeight: 600,
               }}
               aria-pressed={!isAnnual}
             >
@@ -237,22 +241,20 @@ export default function PricingPage() {
             <button
               type="button"
               onClick={() => setIsAnnual(true)}
-              className="px-4 py-1.5 text-xs font-semibold rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+              className="font-sans font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
               style={{
+                borderRadius: 2,
                 backgroundColor: isAnnual ? '#1A1612' : 'transparent',
                 color: isAnnual ? '#FDFAF4' : '#6B6560',
+                padding: '8px 20px',
+                fontSize: 12,
+                fontWeight: 600,
               }}
               aria-pressed={isAnnual}
             >
-              Annual
+              Annual — Save 20%
             </button>
           </div>
-
-          {isAnnual && (
-            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
-              Save 20%
-            </span>
-          )}
         </div>
       </section>
 
@@ -330,7 +332,7 @@ export default function PricingPage() {
 
           {isAnnual && (
             <p className="font-sans text-xs mt-1 mb-2" style={{ color: '#16a34a' }}>
-              Save $120/year
+              Save $360/year
             </p>
           )}
 
@@ -380,7 +382,7 @@ export default function PricingPage() {
 
           {isAnnual && (
             <p className="font-sans text-xs mt-1 mb-2" style={{ color: '#16a34a' }}>
-              Save $240/year
+              Save $1,200/year
             </p>
           )}
 

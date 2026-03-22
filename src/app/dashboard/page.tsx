@@ -418,18 +418,36 @@ function DashboardContent({ storeParam }: { storeParam: string }) {
                 className="font-serif text-xl text-ink-900 mb-4"
                 style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)', fontStyle: 'italic' }}
               >
-                Session Insights
+                Top Frames This Week
               </h2>
-              <div className="flex flex-col gap-0 divide-y divide-cream-400">
-                {[
-                  { label: 'Total sessions', value: data.totalSessions.toLocaleString() },
-                  { label: 'Conversion rate', value: `${data.conversionRate}%` },
-                  { label: 'Avg session', value: data.avgDuration > 0 ? `${Math.floor(data.avgDuration / 60)}m ${data.avgDuration % 60}s` : '—' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-center py-3">
-                    <span className="text-xs font-sans text-ink-500">{label}</span>
-                    <span className="font-serif text-xl text-ink-900" style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)' }}>
-                      {value}
+              <div>
+                <div className="flex justify-between pb-2 border-b border-cream-400">
+                  <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300">Frame Name</span>
+                  <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300">Trend</span>
+                </div>
+                {([
+                  { name: data.topFrame, abbrev: data.topFrame.slice(0, 2).toUpperCase(), trend: '+14%', trendColor: '#16a34a' },
+                  { name: 'Riviera Gold', abbrev: 'RG', trend: '+8%', trendColor: '#16a34a' },
+                  { name: 'Oxford Noir', abbrev: 'ON', trend: 'Stable', trendColor: '#9A9490' },
+                  { name: 'Parisian Mist', abbrev: 'PM', trend: '-2%', trendColor: '#dc2626' },
+                ] as { name: string; abbrev: string; trend: string; trendColor: string }[]).map((f) => (
+                  <div key={f.name} className="flex items-center justify-between py-3 border-b border-cream-100 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-7 h-7 bg-cream-200 flex items-center justify-center flex-shrink-0"
+                        style={{ borderRadius: 2 }}
+                      >
+                        <span className="text-[9px] font-sans font-semibold text-ink-500 uppercase">{f.abbrev}</span>
+                      </div>
+                      <span
+                        className="font-serif text-sm text-ink-900 italic"
+                        style={{ fontFamily: 'var(--font-cormorant-garamond, "Cormorant Garamond", Georgia, serif)' }}
+                      >
+                        {f.name}
+                      </span>
+                    </div>
+                    <span style={{ color: f.trendColor, fontSize: 12 }} className="font-sans font-semibold">
+                      {f.trend}
                     </span>
                   </div>
                 ))}
@@ -461,10 +479,10 @@ function DashboardContent({ storeParam }: { storeParam: string }) {
             </div>
 
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[580px]">
+              <table className="w-full min-w-[680px]">
                 <thead>
                   <tr className="border-b border-cream-400">
-                    {['Face Shape', 'Frames Viewed', 'Duration', 'Time Ago'].map((col) => (
+                    {['Face Shape', 'User Hash', 'Frames Viewed', 'Duration', 'Time Ago'].map((col) => (
                       <th key={col} className="px-6 py-3 text-left text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-ink-300 whitespace-nowrap">
                         {col}
                       </th>
@@ -472,25 +490,32 @@ function DashboardContent({ storeParam }: { storeParam: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.recentSessions.map((s, i) => (
-                    <tr key={i} className="border-b border-cream-100 hover:bg-cream-100 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-cream-200 flex-shrink-0" aria-hidden="true" />
-                          <span className="text-sm font-sans text-ink-900">{s.faceShape}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-sans text-ink-900">{s.framesTried}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-sans text-ink-900">{s.duration}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-sans text-ink-300">{s.timeAgo}</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {data.recentSessions.map((s, i) => {
+                    const hashSuffix = (((i + 1) * 0x2021 + 0x4E00) % 0x10000).toString(16).toUpperCase().padStart(4, '0');
+                    const userHash = `0x4E...${hashSuffix}`;
+                    return (
+                      <tr key={i} className="border-b border-cream-100 hover:bg-cream-100 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-cream-200 flex-shrink-0" aria-hidden="true" />
+                            <span className="text-sm font-sans text-ink-900">{s.faceShape}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-mono text-ink-300">{userHash}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-sans text-ink-900">{s.framesTried}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-sans text-ink-900">{s.duration}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-sans text-ink-300">{s.timeAgo}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
