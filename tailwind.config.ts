@@ -32,8 +32,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans:  ['var(--font-inter)', 'system-ui', 'sans-serif'],
         serif: ['var(--font-cormorant-garamond)', 'Georgia', 'serif'],
+        sans:  ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         sharp: '2px',

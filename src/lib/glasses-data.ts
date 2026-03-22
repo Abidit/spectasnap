@@ -85,7 +85,7 @@ const FEATURED_GLB_FRAMES: GlassesFrame[] = [
     color: '#c9a96e',
     style: 'Aviator',
     styleTag: 'FEATURED',
-    bestFor: ['Oval', 'Heart', 'Diamond'],
+    bestFor: ['Oval', 'Heart', 'Oblong'],
     occasions: ['Casual', 'Office', 'Wedding'],
     staffNote: 'A lightweight metal profile that works from smart-casual to formal wear.',
     svg: buildPreviewSvg('#c9a96e', '#8f9bab', 'aviator'),

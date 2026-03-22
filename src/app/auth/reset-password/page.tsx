@@ -8,28 +8,25 @@ const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError('');
+    if (!SUPABASE_CONFIGURED) { setSent(true); return; }
     setLoading(true);
-
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/auth/new-password',
-    });
-
-    if (authError) {
-      setError(authError.message);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/new-password`,
+      });
+      if (authError) { setError(authError.message); return; }
+      setSent(true);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setLoading(false);
-    setSent(true);
   }
 
   return (
@@ -37,78 +34,115 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <p className="font-serif text-2xl font-semibold text-ink-900">
-            Specta<em style={{ color: '#C9A96E' }}>Snap</em>
-          </p>
-          <p className="text-xs font-sans tracking-widest uppercase text-ink-300 mt-1">
-            Reset your password
+          <p className="font-serif text-3xl italic text-ink-900">
+            Specta<span style={{ color: '#C9A96E' }}>Snap</span>
           </p>
         </div>
 
-        <div className="bg-cream-50 border border-cream-400 p-6" style={{ borderRadius: 2 }}>
+        <div
+          className="bg-cream-50 border border-cream-400 p-8"
+          style={{ borderRadius: 2 }}
+        >
           {sent ? (
-            <div className="text-center py-4">
-              <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-gold-600 mb-2">
+            /* Success state */
+            <div className="text-center py-2">
+              <p
+                className="font-sans font-semibold uppercase mb-3"
+                style={{ fontSize: 10, letterSpacing: '0.14em', color: '#A8844A' }}
+              >
                 Email Sent
               </p>
-              <p className="text-sm font-sans text-ink-500 leading-relaxed">
-                Check your inbox for a password reset link.
+              <h2 className="font-serif text-2xl text-ink-900 mb-2">Check your inbox</h2>
+              <p className="font-sans text-sm text-ink-500 leading-relaxed mb-6">
+                Reset link sent. Check your inbox.
               </p>
               <Link
                 href="/auth/login"
-                className="inline-block mt-4 text-xs font-sans font-medium text-gold-600 hover:underline"
+                className="font-sans text-xs font-semibold text-gold-600 hover:underline"
               >
-                Back to sign in
+                Back to login
               </Link>
             </div>
           ) : (
             <>
-              <p className="text-sm font-sans text-ink-500 mb-4">
+              {/* Eyebrow */}
+              <p
+                className="font-sans font-semibold uppercase mb-2"
+                style={{ fontSize: 10, letterSpacing: '0.14em', color: '#A8844A' }}
+              >
+                Password Reset
+              </p>
+
+              {/* Heading */}
+              <h1 className="font-serif text-3xl text-ink-900 mb-1">Reset your password</h1>
+              <p className="font-sans text-sm text-ink-500 mb-8">
                 Enter your email and we&apos;ll send a reset link.
               </p>
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <div>
-                  <label className="block text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-ink-500 mb-1">
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+                <div className="mb-6">
+                  <label
+                    htmlFor="reset-email"
+                    className="block font-sans font-semibold text-ink-900 uppercase mb-1.5"
+                    style={{ fontSize: 12, letterSpacing: '0.1em' }}
+                  >
                     Email
                   </label>
                   <input
+                    id="reset-email"
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-ink-900 font-sans text-sm
-                               focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                    className="w-full px-3 py-2.5 bg-cream-100 border border-cream-400 text-sm font-sans text-ink-900 focus:outline-none focus:border-gold-500 transition-colors"
                     style={{ borderRadius: 2 }}
-                    placeholder="you@storename.com"
+                    placeholder="you@store.com"
                   />
                 </div>
-
-                {error && (
-                  <p className="text-xs font-sans text-red-400 -mt-2">{error}</p>
-                )}
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 font-sans font-semibold text-sm uppercase tracking-wide
-                             bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="w-full py-3 font-sans font-semibold text-sm bg-ink-900 text-cream-50 hover:opacity-90 disabled:opacity-50 transition-opacity"
                   style={{ borderRadius: 2, minHeight: 44 }}
                 >
-                  {loading ? 'Sending…' : 'Send Reset Link'}
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg
+                        className="animate-spin h-4 w-4 text-cream-50"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8H4z"
+                        />
+                      </svg>
+                      Sending&hellip;
+                    </span>
+                  ) : (
+                    'Send reset link'
+                  )}
                 </button>
               </form>
 
-              <p className="text-center text-xs font-sans text-ink-500 mt-4">
-                <Link href="/auth/login" className="text-gold-600 hover:underline font-medium">
-                  Back to sign in
+              {/* Back link */}
+              <p className="text-center font-sans text-xs text-ink-500 mt-5">
+                <Link href="/auth/login" className="text-gold-600 hover:underline font-semibold">
+                  Back to login
                 </Link>
               </p>
-
-              {!SUPABASE_CONFIGURED && (
-                <p className="text-xs text-ink-300 text-center mt-4 font-sans">
-                  Auth not configured — running in demo mode
-                </p>
-              )}
             </>
           )}
         </div>
