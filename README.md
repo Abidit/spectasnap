@@ -1,329 +1,354 @@
-# SpectaSnap — Real-Time 3D Glasses AR Try-On
+# SpectaSnap — The Digital Curator
 
-**Live URL:** https://spectasnap-orpin.vercel.app
-**Demo:** https://spectasnap-orpin.vercel.app/trydemo
+> Real-time 3D AR glasses try-on for optical stores.
+> Premium B2B SaaS for independent and chain retailers.
 
-Browser-native AR glasses try-on for optical stores. No app install required. Real-time 3D rendering with MediaPipe face tracking at 60fps — customers point their camera and try on frames instantly.
+**Live:** https://spectasnap-orpin.vercel.app
+**Repo:** https://github.com/Abidit/spectasnap
+**Brand:** The Digital Curator — Premium Optic B2B
 
 ---
 
-## 1. Project Overview
+## What is SpectaSnap
 
-SpectaSnap is a **B2B SaaS platform for optical boutiques** that turns any smartphone or laptop camera into an AR try-on mirror. Store owners embed a QR code on their shelf — customers scan it and immediately try 50+ frames in their browser.
-
-**Brand positioning:** "The Digital Curator" — a luxury optical SaaS tool, warm cream/gold design system, Cormorant Garamond display type.
+SpectaSnap is a browser-native AR glasses try-on platform for optical stores. Customers see themselves wearing frames live via webcam — no app, no download. Store owners get analytics, staff tools, and AI-powered recommendations.
 
 **Two audiences:**
-- **Shoppers** — `/trydemo` AR experience (public, no login)
-- **Store owners** — `/dashboard`, `/frames`, `/upload`, `/qr`, `/onepager` (login required)
+- **Shoppers** — `/trydemo` AR experience, public, no login required
+- **Store owners** — `/dashboard`, `/frames`, `/upload`, `/qr`, `/onepager` — login required
 
 ---
 
-## 2. Tech Stack
+## Tech Stack
 
-| Layer | Technology | Version |
+| Package | Version |
+|---|---|
+| next | ^16.1.6 |
+| react | ^18 |
+| react-dom | ^18 |
+| typescript | ^5 |
+| three | ^0.183.1 |
+| @mediapipe/tasks-vision | 0.10.14 |
+| @supabase/supabase-js | ^2.99.3 |
+| @supabase/ssr | ^0.9.0 |
+| @anthropic-ai/sdk | ^0.80.0 |
+| @imgly/background-removal | ^1.7.0 |
+| onnxruntime-web | 1.21.0 |
+| @vercel/kv | ^3.0.0 |
+| @vercel/blob | ^2.3.1 |
+| @vercel/analytics | ^2.0.1 |
+| qrcode | ^1.5.4 |
+| framer-motion | ^11.3.0 |
+| lucide-react | ^0.400.0 |
+| tailwindcss | ^3 |
+| kalmanjs | ^1.1.0 |
+| clsx | ^2.1.1 |
+
+Fonts loaded via `next/font/google`: **Inter** (body) + **Cormorant Garamond** (display).
+
+---
+
+## Design System
+
+### Colors
+
+```
+cream-50:   #FDFAF4   page background
+cream-100:  #F5F0E8   panel background
+cream-200:  #EDE8DC   chip/tag backgrounds
+cream-400:  #DDD8CE   borders, dividers
+ink-900:    #1A1612   primary text
+ink-500:    #6B6560   secondary text
+ink-300:    #9A9490   muted text, icons
+gold-500:   #C9A96E   primary accent — selected states, CTAs
+gold-600:   #A8844A   darker gold — hover, active
+gold-100:   #F7EDD8   light gold tint
+dark:       #0A0A0A   camera viewport background
+```
+
+### Typography
+
+- **Display / frame names** — `font-serif` (Cormorant Garamond), 18–24px, semibold
+- **UI labels, tags, buttons** — `font-sans` (Inter), 9–11px, semibold, uppercase, wide tracking
+- **Body copy** — `font-sans`, 13–14px, normal weight
+
+### Border Radius
+
+```
+rounded-sharp = 2px   everywhere in demo/store pages — no exceptions
+rounded-full          pills and circular swatches/dots only
+```
+
+> **Rule:** Every button, input, card, and chip in the store owner UI uses `borderRadius: 2` (`rounded-sharp`). Never use `rounded-md`, `rounded-lg`, or `rounded-xl` in demo context.
+
+### Two Styling Contexts
+
+SpectaSnap has two separate token sets. Never mix them.
+
+| Context | Files | Tokens |
 |---|---|---|
-| Framework | Next.js (App Router) | ^16.1.6 |
-| Language | TypeScript (strict) | ^5 |
-| React | React + React DOM | ^18 |
-| 3D rendering | Three.js | ^0.183.1 |
-| Face tracking | @mediapipe/tasks-vision | 0.10.14 |
-| Auth | @supabase/supabase-js + @supabase/ssr | ^2.99.3 / ^0.9.0 |
-| AI Stylist | @anthropic-ai/sdk (Claude Sonnet 4) | ^0.80.0 |
-| Background removal | @imgly/background-removal + onnxruntime-web | ^1.7.0 / 1.21.0 |
-| Session analytics | @vercel/kv | ^3.0.0 |
-| File storage | @vercel/blob | ^2.3.1 |
-| Analytics | @vercel/analytics | ^2.0.1 |
-| QR generation | qrcode | ^1.5.4 |
-| Animation | framer-motion | ^11.3.0 |
-| Icons | lucide-react | ^0.400.0 |
-| Styling | Tailwind CSS + CSS Modules | ^3 |
-| Fonts | Inter (body) + Cormorant Garamond (display) | next/font/google |
-| Tracking filter | kalmanjs | ^1.1.0 |
-| Deployment | Vercel | — |
+| Store owner / demo | `src/app/globals.css`, all `tailwind.config.ts` tokens | cream/ink/gold |
+| Landing page | `src/app/landing.module.css` | CSS custom properties, blue accent `#2563EB` |
 
 ---
 
-## 3. Project Structure
+## Project Structure
 
 ```
 spectasnap/
 ├── src/
-│   ├── app/                          # Next.js App Router pages
-│   │   ├── layout.tsx                # Root layout — fonts, metadata, Vercel Analytics
-│   │   ├── globals.css               # Tailwind base, CSS variables, print styles
-│   │   ├── page.tsx                  # Landing page (Server Component, SEO metadata)
-│   │   ├── LandingClient.tsx         # Landing page content (server component)
-│   │   ├── LandingV2.tsx             # Updated landing with cream/gold design
-│   │   ├── PilotForm.tsx             # B2B pilot lead capture (Formspree, 'use client')
-│   │   ├── landing.module.css        # Landing page CSS Modules (SaaS blue tokens)
-│   │   ├── landing2.module.css       # V2 landing styles
+│   ├── app/
+│   │   ├── layout.tsx                  # Root layout — fonts, metadata, Analytics
+│   │   ├── globals.css                 # Tailwind base + CSS vars + print styles
+│   │   ├── page.tsx                    # Landing page (Server Component, SEO)
+│   │   ├── LandingClient.tsx           # Landing content (server component)
+│   │   ├── LandingV2.tsx               # Updated landing (cream/gold design)
+│   │   ├── PilotForm.tsx               # B2B pilot lead capture — Formspree
+│   │   ├── landing.module.css          # Landing CSS Modules
+│   │   ├── landing2.module.css         # V2 landing styles
 │   │   ├── trydemo/
-│   │   │   ├── layout.tsx            # noindex, canonical
-│   │   │   └── page.tsx              # AR try-on page ('use client') — main consumer experience
+│   │   │   ├── layout.tsx              # noindex, canonical
+│   │   │   └── page.tsx                # AR try-on page ('use client')
 │   │   ├── dashboard/
 │   │   │   ├── layout.tsx
-│   │   │   └── page.tsx              # Store owner dashboard — stats, top frames, sessions
+│   │   │   └── page.tsx                # Store analytics — stats, top frames, sessions
 │   │   ├── frames/
-│   │   │   └── page.tsx              # Frames catalog — 9 curated styles, search, filter, sort
+│   │   │   └── page.tsx                # Frame catalog — search, filter, sort
 │   │   ├── upload/
 │   │   │   ├── layout.tsx
-│   │   │   └── page.tsx              # Frame upload wizard — 4 steps, bg removal, calibration
+│   │   │   └── page.tsx                # 4-step upload wizard — bg removal, calibration
 │   │   ├── qr/
 │   │   │   ├── layout.tsx
-│   │   │   └── page.tsx              # QR code generator — download PNG/SVG, print
+│   │   │   └── page.tsx                # QR code generator — PNG/SVG/print
 │   │   ├── onepager/
 │   │   │   ├── layout.tsx
-│   │   │   └── page.tsx              # Printable sales one-pager for store pitches
+│   │   │   └── page.tsx                # Printable A4 sales one-pager
 │   │   ├── pricing/
-│   │   │   └── page.tsx              # Pricing plans — Starter/Pro/Business, monthly/annual
+│   │   │   └── page.tsx                # Starter / Pro / Business plans
 │   │   ├── onboarding/
-│   │   │   └── page.tsx              # 3-step store setup wizard (Identity → PIN → Launch)
+│   │   │   └── page.tsx                # 3-step store setup: Identity → PIN → Launch
 │   │   ├── embed/
-│   │   │   ├── layout.tsx            # Embedded iframe try-on (no chrome)
-│   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx                # Embeddable iframe (no chrome)
 │   │   ├── auth/
-│   │   │   ├── login/page.tsx        # Two-column login — Supabase email/password
-│   │   │   ├── signup/page.tsx       # Two-column signup — all fields + terms
-│   │   │   ├── verify/page.tsx       # Email verification — resend button
-│   │   │   ├── reset-password/page.tsx  # Send reset link
-│   │   │   └── new-password/page.tsx # Set new password + auto-redirect to dashboard
+│   │   │   ├── login/page.tsx          # Two-column Supabase login
+│   │   │   ├── signup/page.tsx         # Two-column signup + terms
+│   │   │   ├── verify/page.tsx         # Email verification prompt
+│   │   │   ├── reset-password/page.tsx # Send reset link
+│   │   │   └── new-password/page.tsx   # Set new password → auto-redirect
 │   │   ├── admin/
-│   │   │   ├── layout.tsx            # Admin-only gate (ADMIN_EMAILS env var)
-│   │   │   ├── page.tsx              # Admin dashboard
-│   │   │   ├── catalog/page.tsx      # Catalog management
-│   │   │   ├── models/page.tsx       # 3D model registry editor
+│   │   │   ├── layout.tsx              # ADMIN_EMAILS gate → 404
+│   │   │   ├── page.tsx
+│   │   │   ├── catalog/page.tsx
+│   │   │   ├── models/page.tsx
 │   │   │   └── generate-glb/
 │   │   │       ├── layout.tsx
-│   │   │       └── page.tsx          # GLB generation tool
+│   │   │       └── page.tsx
 │   │   └── api/
-│   │       ├── session/route.ts      # POST — log AR try-on session to Vercel KV
-│   │       ├── stats/route.ts        # GET — aggregate analytics (shape breakdown, top frames)
-│   │       ├── stylist/route.ts      # POST — Claude Sonnet 4 AI frame recommendations
-│   │       ├── catalog/route.ts      # GET/POST — frame catalog management
-│   │       ├── store/route.ts        # GET/PATCH — store settings
-│   │       └── upload-glb/route.ts   # POST — GLB upload to Vercel Blob
+│   │       ├── session/route.ts        # POST — log session to Vercel KV
+│   │       ├── stats/route.ts          # GET — analytics aggregate
+│   │       ├── stylist/route.ts        # POST — Claude AI recommendations
+│   │       ├── catalog/route.ts        # GET/POST — frame catalog CRUD
+│   │       ├── store/route.ts          # GET/PATCH — store settings
+│   │       └── upload-glb/route.ts     # POST — GLB to Vercel Blob
 │   │
-│   ├── ar/                           # AR engine (Three.js + MediaPipe)
-│   │   ├── pose.ts                   # 6DOF face tracking — cx/cy/ipd/roll/yaw/pitch + EMA smoother
-│   │   ├── threeScene.ts             # Three.js singleton — renderer, scene, model switching
-│   │   ├── proceduralGlasses.ts      # Procedural frame geometry (no GLB files needed)
-│   │   ├── proceduralTemples.ts      # Temple arm geometry
-│   │   ├── presets.ts                # 50 frame presets + 6 ColorVariant swatches
-│   │   ├── occluder.ts               # Face mesh occluder (hides glasses behind ears/nose)
-│   │   ├── triangulation.ts          # MediaPipe 478-point triangle indices
-│   │   ├── customFrameLoader.ts      # GLB loader for custom uploaded frames
-│   │   ├── glassesDetector.ts        # Style detection utilities
-│   │   ├── glbCalibrate.ts           # GLB model calibration helpers
-│   │   ├── glbTempleAnimate.ts       # Temple arm animation for GLB models
-│   │   ├── glbTempleDetect.ts        # Temple bone detection in GLB
-│   │   ├── inpaint.ts                # Frame image inpainting utilities
-│   │   ├── pdMeasure.ts              # Pupillary distance measurement
-│   │   ├── pdOverlay.ts              # PD measurement canvas overlay
-│   │   ├── photochromic.ts           # Photochromic lens simulation
-│   │   └── recorder.ts               # AR session recording
+│   ├── ar/                             # AR engine
+│   │   ├── pose.ts                     # 6DOF face tracking + EMA smoother
+│   │   ├── threeScene.ts               # Three.js singleton — renderer, scene, models
+│   │   ├── proceduralGlasses.ts        # Frame geometry generated at runtime
+│   │   ├── proceduralTemples.ts        # Temple arm geometry
+│   │   ├── presets.ts                  # 50 frame presets + 6 color variants
+│   │   ├── occluder.ts                 # Face mesh occluder (depth masking)
+│   │   ├── triangulation.ts            # MediaPipe 478-pt triangle indices
+│   │   ├── customFrameLoader.ts        # GLB loader for uploaded frames
+│   │   ├── glassesDetector.ts          # Style detection utilities
+│   │   ├── glbCalibrate.ts             # GLB calibration helpers
+│   │   ├── glbTempleAnimate.ts         # Temple animation for GLB models
+│   │   ├── glbTempleDetect.ts          # Temple bone detection in GLB
+│   │   ├── inpaint.ts                  # Frame image inpainting
+│   │   ├── pdMeasure.ts                # Pupillary distance measurement
+│   │   ├── pdOverlay.ts                # PD canvas overlay
+│   │   ├── photochromic.ts             # Photochromic lens simulation
+│   │   └── recorder.ts                 # AR session recording
 │   │
 │   ├── components/
-│   │   ├── ar/                       # AR demo components ('use client')
-│   │   │   ├── ARCamera.tsx          # Main AR component — camera stream + MediaPipe loop
-│   │   │   ├── ThreeOverlay.tsx      # React wrapper around threeScene.ts
-│   │   │   ├── GlassesGrid.tsx       # Horizontal scrollable frame picker + filter bar
-│   │   │   ├── ProductCard.tsx       # Desktop sidebar — frame details, AI stylist trigger
-│   │   │   ├── MobileBottomSheet.tsx # 3-snap mobile sheet (72px / 300px / 85vh)
-│   │   │   ├── AIStylePanel.tsx      # 5-question quiz → 3 AI frame recommendations
-│   │   │   ├── ARStatusBadge.tsx     # AR tracking status indicator
-│   │   │   ├── ShareModal.tsx        # Canvas watermark compositing + share/download
-│   │   │   ├── CompareTray.tsx       # Side-by-side frame comparison
-│   │   │   └── MediaPipeLoader.tsx   # AR init overlay (4 stages)
-│   │   ├── layout/                   # Shell components
-│   │   │   ├── Sidebar.tsx           # Left nav — logo + "DIGITAL CURATOR", top/bottom nav
-│   │   │   ├── TopBar.tsx            # Sticky 56px header — logo, title, store pill
-│   │   │   ├── BottomNav.tsx         # Mobile bottom navigation
-│   │   │   ├── TrialBanner.tsx       # Trial status banner (early/late/ended states)
-│   │   │   └── PaywallModal.tsx      # Upgrade gate modal
+│   │   ├── ar/                         # AR demo components
+│   │   │   ├── ARCamera.tsx            # Camera + MediaPipe render loop
+│   │   │   ├── ThreeOverlay.tsx        # React wrapper for threeScene.ts
+│   │   │   ├── GlassesGrid.tsx         # Horizontal frame picker + filter bar
+│   │   │   ├── ProductCard.tsx         # Desktop sidebar — details, swatches, AI
+│   │   │   ├── MobileBottomSheet.tsx   # 3-snap sheet (72px / 300px / 85vh)
+│   │   │   ├── AIStylePanel.tsx        # 5-question quiz → 3 AI recs
+│   │   │   ├── ARStatusBadge.tsx       # idle/loading/tracking/error badge
+│   │   │   ├── ShareModal.tsx          # Canvas watermark + download/share
+│   │   │   ├── CompareTray.tsx         # Side-by-side frame comparison
+│   │   │   └── MediaPipeLoader.tsx     # AR init overlay (4 stages)
+│   │   ├── layout/                     # Shell components
+│   │   │   ├── Sidebar.tsx             # Icon sidebar — logo + nav groups
+│   │   │   ├── TopBar.tsx              # 56px sticky header
+│   │   │   ├── BottomNav.tsx           # Mobile bottom nav
+│   │   │   ├── TrialBanner.tsx         # Trial status (early / late / ended)
+│   │   │   └── PaywallModal.tsx        # Upgrade gate modal
 │   │   ├── frames/
-│   │   │   └── FramePreview.tsx      # Canvas-based frame schematic preview
-│   │   └── ui/                       # Primitive UI components
+│   │   │   └── FramePreview.tsx        # Canvas frame schematic preview
+│   │   └── ui/
 │   │       ├── Button.tsx
 │   │       ├── Input.tsx
 │   │       ├── Badge.tsx
 │   │       └── Toast.tsx
 │   │
 │   ├── lib/
-│   │   ├── glasses-data.ts           # GLASSES_COLLECTION — 55 frames (source of truth)
-│   │   ├── supabase.ts               # Supabase browser client
-│   │   ├── supabase-server.ts        # Supabase server client (Server Components / API routes)
-│   │   ├── removeBackground.ts       # @imgly/background-removal wrapper
-│   │   ├── suitability.ts            # Face shape → frame suitability scoring
-│   │   ├── embedApi.ts               # Embed SDK utilities
-│   │   └── face-overlay.ts           # 2D canvas fallback overlay (legacy)
+│   │   ├── glasses-data.ts             # GLASSES_COLLECTION — 55 frames (source of truth)
+│   │   ├── supabase.ts                 # Supabase browser client
+│   │   ├── supabase-server.ts          # Supabase server client (SSR/API)
+│   │   ├── removeBackground.ts         # @imgly/background-removal wrapper
+│   │   ├── suitability.ts              # Face shape → frame suitability scoring
+│   │   ├── embedApi.ts                 # Embed SDK utilities
+│   │   └── face-overlay.ts             # 2D canvas fallback (legacy)
 │   │
-│   └── middleware.ts                 # Route protection — Supabase session refresh + redirects
+│   └── middleware.ts                   # Route protection + Supabase session refresh
 │
 ├── public/
-│   ├── models/models.json            # 3D model registry (frameId → type/presetId/scale)
-│   ├── embed.js                      # Embeddable widget script
-│   ├── favicon.svg                   # SVG favicon
-│   ├── og-image.svg                  # OG social card (1200×630)
+│   ├── models/models.json              # Frame registry: frameId → type/presetId/scale
+│   ├── embed.js                        # Embeddable widget script
+│   ├── favicon.svg
+│   ├── og-image.svg                    # 1200×630 OG social card
 │   ├── robots.txt
-│   └── sitemap.xml                   # Landing page only (trydemo excluded)
+│   └── sitemap.xml
 │
-├── tailwind.config.ts                # Design tokens (cream/ink/gold palette)
-├── next.config.ts                    # COOP/COEP headers, turbopack
-├── CLAUDE.md                         # AI agent instructions + design system contracts
-├── SPRINT_STATUS.md                  # Sprint history and CEO action items
-└── REDESIGN_REPORT.md                # Figma redesign implementation notes
+├── tailwind.config.ts
+├── next.config.ts                      # COOP/COEP headers (required for WASM threading)
+├── CLAUDE.md                           # AI agent instructions + design system contracts
+├── SPRINT_STATUS.md
+├── REDESIGN_REPORT.md
+└── DEPLOYMENT_RUNBOOK.md
 ```
 
 ---
 
-## 4. Pages & Routes
+## Pages & Routes
 
-| Route | Auth Required | Description |
+| Route | Auth | Description |
 |---|---|---|
 | `/` | No | Landing page — hero, features, B2B pilot form |
-| `/trydemo` | No | AR try-on experience (main consumer product) |
-| `/embed` | No | Embeddable iframe version (no shell chrome) |
+| `/trydemo` | No | AR try-on (main consumer product) — noindex |
+| `/embed` | No | Embeddable iframe, no chrome |
 | `/pricing` | No | Starter / Professional / Business plans |
-| `/dashboard` | Yes | Store analytics — sessions, top frames, face shapes |
-| `/frames` | Yes | Frame catalog — 9 styles, search, filter, sort |
-| `/upload` | Yes | 4-step upload wizard — bg removal + calibration |
-| `/qr` | Yes | QR code generator — PNG/SVG download + print |
+| `/dashboard` | Yes | Store analytics — sessions, frames, face shapes |
+| `/frames` | Yes | Frame catalog — search, filter, sort |
+| `/upload` | Yes | 4-step upload wizard |
+| `/qr` | Yes | QR code generator |
 | `/onepager` | Yes | Printable sales one-pager |
 | `/onboarding` | Yes | 3-step store setup wizard |
-| `/auth/login` | No | Email + password login |
+| `/auth/login` | No | Supabase email/password login |
 | `/auth/signup` | No | New account registration |
-| `/auth/verify` | No | Email verification prompt |
-| `/auth/reset-password` | No | Send password reset email |
-| `/auth/new-password` | No | Set new password (from reset link) |
-| `/admin` | Admin only | Admin dashboard (ADMIN_EMAILS whitelist) |
-| `/admin/catalog` | Admin only | Catalog management |
-| `/admin/models` | Admin only | 3D model registry |
-| `/admin/generate-glb` | Admin only | GLB generation tool |
-| `/api/session` | — | POST — log try-on session (Vercel KV) |
-| `/api/stats` | — | GET — aggregate analytics |
-| `/api/stylist` | — | POST — AI frame recommendations (Claude) |
-| `/api/catalog` | — | GET/POST — frame catalog CRUD |
+| `/auth/verify` | No | Email verification |
+| `/auth/reset-password` | No | Send reset email |
+| `/auth/new-password` | No | Set new password |
+| `/admin/*` | Admin only | Catalog + model management (ADMIN_EMAILS whitelist) |
+| `/api/session` | — | POST — log try-on session |
+| `/api/stats` | — | GET — analytics aggregate |
+| `/api/stylist` | — | POST — Claude AI recommendations |
+| `/api/catalog` | — | GET/POST — frame catalog |
 | `/api/store` | — | GET/PATCH — store settings |
-| `/api/upload-glb` | — | POST — upload GLB to Vercel Blob |
+| `/api/upload-glb` | — | POST — GLB to Vercel Blob |
 
-**Route protection** (`middleware.ts`):
-- `/dashboard`, `/frames`, `/upload`, `/qr`, `/onepager`, `/onboarding`, `/settings` → redirect to `/auth/login?next=<path>` if unauthenticated
-- `/admin/*` → 404 if not in `ADMIN_EMAILS`
+**Middleware rules:**
+- Protected routes → redirect to `/auth/login?next=<path>` if unauthenticated
+- `/admin/*` → 404 if email not in `ADMIN_EMAILS`
 - `/auth/*` → redirect to `/dashboard` if already logged in
-- If `NEXT_PUBLIC_SUPABASE_URL` is unset → **demo mode**: all routes accessible without login
+- `NEXT_PUBLIC_SUPABASE_URL` unset → **demo mode**: all routes open, no auth checks
 
 ---
 
-## 5. Components
+## AR Pipeline
 
-### AR Components (`src/components/ar/`)
+```
+Webcam
+  → MediaPipe FaceLandmarker (478 landmarks, VIDEO mode, 60fps)
+  → pose.ts: computeTransform()
+      cx, cy   — normalised face centre (eye midpoint)
+      ipd      — inter-pupillary distance (pixels)
+      roll     — atan2(eye_R.y - eye_L.y, eye_R.x - eye_L.x)
+      yaw      — (lp.z - rp.z) × 3.5  (depth asymmetry)
+      pitch    — nose z-delta
+  → pose.ts: smooth()  — EMA α=0.65 per DOF
+  → threeScene.ts: applyFaceTransform()
+      positions/rotates Three.js model group
+      MODEL_BASE_ROTATION_Z = Math.PI  (180° orientation correction)
+  → proceduralGlasses.ts
+      TubeGeometry (round/aviator/cat-eye)
+      BoxGeometry (rectangle)
+      CylinderGeometry (bridge)
+      MeshPhysicalMaterial: transmission 0.85, ior 1.5
+  → occluder.ts
+      478-point face mesh, colorWrite:false, depthWrite:true
+      Hides glasses geometry behind ears and nose
+  → Three.js WebGL canvas composited over <video>
+```
 
-**`ARCamera.tsx`** — Main AR orchestrator. Initialises MediaPipe FaceLandmarker, manages webcam stream, drives the 60fps render loop. Props: `selectedGlasses`, `selectedColor?`, `onARStatusChange?`.
-
-**`GlassesGrid.tsx`** — Horizontal scrollable frame picker. Contains `FrameFilterBar` with 6 filter tabs (all / round / rectangle / aviator / cat-eye / sport-wrap). Filter state is local.
-
-**`ProductCard.tsx`** — Desktop right sidebar. Frame details, face shape suitability, 6 colour swatches, AI Stylist trigger.
-
-**`MobileBottomSheet.tsx`** — 3-snap drawer for mobile (collapsed 72px / half 300px / full 85vh). Drag gestures for snap transitions. Frame Finish swatches are 28×28px squares (`borderRadius: 2`).
-
-**`AIStylePanel.tsx`** — 5-question quiz → POST `/api/stylist` → 3 recommendation cards. 1500ms minimum loading animation.
-
-**`ARStatusBadge.tsx`** — AR status indicator: `idle` → `loading` → `searching` → `tracking` → `error`. Uses `aria-live="polite"`.
-
-**`MediaPipeLoader.tsx`** — Full-screen AR init overlay. 4 stages: loading WASM → downloading model → initialising camera → ready.
-
-**`ShareModal.tsx`** — Canvas compositing: "SpectaSnap" watermark + download PNG / Web Share API.
-
-**`CompareTray.tsx`** — Side-by-side frame comparison tray (up to 4 frames).
-
-### Layout Components (`src/components/layout/`)
-
-**`Sidebar.tsx`** — 64px icon sidebar. Logo area with "DIGITAL CURATOR" subtitle. Top nav: Try-On, Dashboard, Frames, Upload, QR Code, One-Pager. Bottom nav: Settings.
-
-**`TopBar.tsx`** — Sticky 56px header. Logo left, page title center (italic serif), store name pill right. Optional `TrialBanner` below.
-
-**`TrialBanner.tsx`** — Trial status: early (>7 days), late (≤7 days), ended (upgrade CTA). Props: `daysLeft`.
-
-**`PaywallModal.tsx`** — Full-screen upgrade gate modal.
+Yaw fade: model opacity → 0 at |yaw| > 0.42 rad. All 55 frames use procedural geometry — no `.glb` files required. Color changes via `updateGlassesColor()` in `proceduralGlasses.ts`.
 
 ---
 
-## 6. AR Pipeline
+## Components
 
-```
-Webcam → MediaPipe FaceLandmarker (478 landmarks, VIDEO mode, 60fps)
-  ↓
-pose.ts: computeTransform()
-  - cx, cy  — normalised face centre (eye midpoint)
-  - ipd     — interpupillary distance (pixels)
-  - roll    — atan2(eye_R.y - eye_L.y, eye_R.x - eye_L.x)
-  - yaw     — (lp.z - rp.z) × 3.5 depth asymmetry
-  - pitch   — nose z-delta
-  ↓
-pose.ts: smooth()  — EMA α=0.65 per degree of freedom
-  ↓
-threeScene.ts: applyFaceTransform()
-  - Positions/rotates Three.js model group
-  - MODEL_BASE_ROTATION_Z = Math.PI (orientation correction)
-  ↓
-proceduralGlasses.ts — generates geometry from presets.ts at runtime
-  - Lens: TubeGeometry (round/aviator/cat-eye), BoxGeometry (rectangle)
-  - Bridge: CylinderGeometry
-  - Material: MeshPhysicalMaterial (transmission:0.85, ior:1.5)
-  ↓
-occluder.ts — 478-point face mesh (colorWrite:false, depthWrite:true)
-  Hides glasses behind ears/nose for realistic depth compositing
-  ↓
-Three.js WebGL canvas composited over <video> element
-```
+### `ARCamera` (`src/components/ar/ARCamera.tsx`)
+Main AR orchestrator. Initialises MediaPipe, manages camera stream, drives the 60fps loop.
+Props: `selectedGlasses`, `selectedColor?`, `onARStatusChange?`.
+Always pass `onARStatusChange` to keep `ARStatusBadge` in sync.
 
-Key details: Yaw fade at |yaw| > 0.42 rad (extreme profile). Color changes via `updateGlassesColor()` in `proceduralGlasses.ts`. All 55 frames use procedural geometry — `public/models/models.json` maps frame IDs to `presetId`.
+### `GlassesGrid` (`src/components/ar/GlassesGrid.tsx`)
+Horizontal scrollable frame picker + `FrameFilterBar` (6 tabs).
+Props: `selected`, `onSelect`. Filter state is local — do not lift.
 
----
+### `ProductCard` (`src/components/ar/ProductCard.tsx`)
+Desktop right sidebar. Frame name, style, face shape suitability, 6 colour swatches, AI Stylist trigger.
+`onAskStaff` is the primary conversion action — always wire it.
 
-## 7. Design System
+### `MobileBottomSheet` (`src/components/ar/MobileBottomSheet.tsx`)
+3-snap touch drawer. Collapsed (72px) → half (300px) → full (85vh).
+Frame Finish swatches: 28×28px squares, `borderRadius: 2`.
+CTAs: "AI CURATOR INSIGHTS" → `onAskStaff`, "PURCHASE · EXPRESS DELIVERY" → `onShareLook`.
 
-SpectaSnap has two separate styling contexts. Never mix tokens between them.
+### `AIStylePanel` (`src/components/ar/AIStylePanel.tsx`)
+5-question quiz → POST `/api/stylist` → 3 AI recommendation cards.
+Minimum 1500ms loading animation. Uses Claude Sonnet 4.
 
-### Demo / Store owner pages — Tailwind tokens (`tailwind.config.ts`)
+### `ARStatusBadge` (`src/components/ar/ARStatusBadge.tsx`)
+Status: `idle` (grey) → `loading` (gold pulse) → `searching` → `tracking` (gold + "AR Live") → `error` (red).
+`aria-live="polite"`. Only status surface in the UI — do not add secondary indicators.
 
-```
-cream-50:  #FDFAF4   page background
-cream-100: #F5F0E8   panel background
-cream-200: #EDE8DC   chip/tag backgrounds
-cream-400: #DDD8CE   borders, dividers
-ink-900:   #1A1612   primary text
-ink-500:   #6B6560   secondary text
-ink-300:   #9A9490   muted text, icons
-gold-500:  #C9A96E   primary accent — selected states, CTAs
-gold-600:  #A8844A   darker gold — hover, active
-gold-100:  #F7EDD8   light gold tint
-dark:      #0A0A0A   camera viewport background
-```
+### `MediaPipeLoader` (`src/components/ar/MediaPipeLoader.tsx`)
+Full-screen init overlay. 4 stages: WASM → model → camera → ready.
 
-- Display / frame names: `font-serif` (Cormorant Garamond), 18–24px
-- UI labels/buttons: `font-sans` (Inter), 9–11px, uppercase, wide tracking
-- **Border radius: 2px (`rounded-sharp`) everywhere** — no rounded corners except circular dots/swatches
+### `ShareModal` (`src/components/ar/ShareModal.tsx`)
+Canvas watermark ("SpectaSnap" italic serif, rgba 0.88, bottom-right) + PNG download / Web Share API.
 
-### Landing page — CSS Modules (`landing.module.css`)
+### `Sidebar` (`src/components/layout/Sidebar.tsx`)
+Icon sidebar, 64px wide. Logo + "DIGITAL CURATOR" subtitle.
+Top nav: Try-On, Dashboard, Frames, Upload, QR Code, One-Pager.
+Bottom nav: Settings only.
 
-```
---bg: #F7F7F5  --text: #111111  --muted: #5C5C5C
---accent: #2563EB (blue)  --radius: 12px  --radius-sm: 8px
-```
+### `TopBar` (`src/components/layout/TopBar.tsx`)
+Sticky 56px header. Logo left, italic serif page title center, store name pill right.
+Props: `pageTitle?`, `storeName?`, `showTrial?`, `trialDaysLeft?`.
 
-Typography: Sora (headings) + Inter (body). Form inputs: `border-radius: 2px`.
+### `TrialBanner` (`src/components/layout/TrialBanner.tsx`)
+Trial status — 3 states: early (>7 days), late (≤7 days, urgent), ended (upgrade CTA).
+
+### `PaywallModal` (`src/components/layout/PaywallModal.tsx`)
+Full-screen upgrade gate. Gold primary CTA, ghost dismiss link.
 
 ---
 
-## 8. Environment Variables
+## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | For auth | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For auth | Supabase anon key |
-| `ANTHROPIC_API_KEY` | For AI Stylist | Claude Sonnet 4 API key |
+| `ANTHROPIC_API_KEY` | For AI Stylist | Claude Sonnet 4 key |
 | `KV_URL` | For analytics | Vercel KV connection string |
 | `KV_REST_API_URL` | For analytics | Vercel KV REST URL |
 | `KV_REST_API_TOKEN` | For analytics | Vercel KV token |
@@ -331,88 +356,76 @@ Typography: Sora (headings) + Inter (body). Form inputs: `border-radius: 2px`.
 | `BLOB_READ_WRITE_TOKEN` | For GLB uploads | Vercel Blob token |
 | `ADMIN_EMAILS` | For admin routes | Comma-separated admin email list |
 
-**Demo mode:** If `NEXT_PUBLIC_SUPABASE_URL` is not set, all auth middleware is bypassed. All store owner pages are accessible without login. This is the current state on the live demo.
+Without `NEXT_PUBLIC_SUPABASE_URL` → demo mode, all routes accessible without login. Without `ANTHROPIC_API_KEY` → AI Stylist shows a graceful error, rest of app unaffected.
 
 ---
 
-## 9. Getting Started
+## Getting Started
 
 ```bash
-# Install dependencies
 yarn install
 
-# Start local dev server (http://localhost:3000)
-yarn dev
+# copy and fill in env vars
+cp .env.example .env.local
 
-# Type-check
-yarn tsc --noEmit
-
-# Lint
-yarn lint
-
-# Format
-yarn format
-
-# Production build
-yarn build
+yarn dev          # http://localhost:3000
+yarn tsc --noEmit # type-check
+yarn lint         # ESLint
+yarn format       # Prettier
+yarn build        # production build
 ```
 
-MediaPipe WASM is loaded from CDN at runtime — no manual download needed.
+MediaPipe WASM loads from `cdn.jsdelivr.net` at runtime — internet required in dev.
 
-**Without Supabase:** Leave `NEXT_PUBLIC_SUPABASE_URL` unset. All store owner pages are accessible without login (demo mode).
-
-**With Supabase:**
-1. Create a project at https://supabase.com
-2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local`
-3. Enable Email auth in Supabase → Auth → Providers
-4. Set redirect URL: `http://localhost:3000/auth/callback`
+`reactStrictMode: false` is intentional — prevents double MediaPipe init in dev mode.
+`ARCamera` uses `dynamic(() => import(...), { ssr: false })` — do not remove `ssr: false`.
 
 ---
 
-## 10. Deploy
+## Deploy
 
 ```bash
 vercel --prod
 ```
 
-Vercel auto-deploys on push to `main`. `vercel.json` sets COOP/COEP headers required for SharedArrayBuffer (MediaPipe WASM threading).
+Auto-deploys on push to `main`. `vercel.json` sets COOP/COEP headers required for SharedArrayBuffer (MediaPipe WASM threading).
 
-**Set up Vercel KV for analytics:**
+Set up Vercel KV once:
 ```bash
 npx vercel kv create spectasnap-sessions
 vercel --prod
 ```
 
-All environment variables must be added in Vercel → Project Settings → Environment Variables before deploying with auth or AI features enabled.
+Full deploy instructions, DNS setup, rollback procedure, and post-deploy checklist: see `DEPLOYMENT_RUNBOOK.md`.
 
 ---
 
-## 11. Current Status
+## Current Status
 
 | Feature | Status | Notes |
 |---|---|---|
 | AR try-on (/trydemo) | ✅ Live | 55 frames, 6 colour variants, mobile + desktop |
-| Dashboard analytics | ✅ Live | Real data from Vercel KV, 30s auto-refresh |
+| Dashboard analytics | ✅ Live | Real Vercel KV data, 30s auto-refresh |
 | AI Stylist | ✅ Live | Requires `ANTHROPIC_API_KEY` |
-| Supabase auth | ✅ Live | Requires Supabase env vars; demo mode if unset |
-| Frame catalog (/frames) | ✅ Live | 9 curated styles, search + filter + sort |
-| Upload wizard (/upload) | ✅ Live | 4-step, bg removal, GLB calibration |
+| Supabase auth | ✅ Live | Demo mode if env vars unset |
+| Frame catalog (/frames) | ✅ Live | 9 styles, search, filter, sort |
+| Upload wizard (/upload) | ✅ Live | 4 steps, bg removal, GLB calibration |
 | QR generator (/qr) | ✅ Live | PNG/SVG download, print |
 | Sales one-pager (/onepager) | ✅ Live | Browser print → PDF |
 | Pricing page | ✅ Live | 3 plans, monthly/annual toggle |
-| Onboarding wizard | ✅ Live | 3 steps: Identity → PIN → Launch |
-| Embedded widget | ✅ Live | `/embed` + `public/embed.js` |
-| Frame comparison | ✅ Live | CompareTray side-by-side |
+| Onboarding wizard | ✅ Live | 3 steps |
+| Frame comparison | ✅ Live | CompareTray — up to 4 frames |
 | Share + watermark | ✅ Live | Canvas compositing, Web Share API |
+| Embedded widget | ✅ Live | `/embed` + `public/embed.js` |
 | Custom GLB upload | 🚧 Admin only | `/admin/generate-glb` + Vercel Blob |
-| PD measurement | 🚧 Built | `pdMeasure.ts` — not surfaced in UI |
-| Photochromic lenses | 🚧 Built | `photochromic.ts` — not surfaced in UI |
-| Session recording | 🚧 Built | `recorder.ts` — not surfaced in UI |
-| Real glasses photos | ❌ Not started | All frames use procedural geometry |
+| PD measurement | 🚧 Built, not surfaced | `src/ar/pdMeasure.ts` |
+| Photochromic lenses | 🚧 Built, not surfaced | `src/ar/photochromic.ts` |
+| Session recording | 🚧 Built, not surfaced | `src/ar/recorder.ts` |
+| Real glasses photos | ❌ Not started | All frames use procedural Three.js geometry |
 
 ---
 
-## 12. Sprint Status
+## Sprint History
 
 | Sprint | PR | Status |
 |---|---|---|
@@ -422,13 +435,4 @@ All environment variables must be added in Vercel → Project Settings → Envir
 | Continue Build — Auth Wiring + Real Data | #18 | ✅ Merged |
 | Figma Redesign Sprint (10 screens) | #20 | ✅ Merged |
 
-See `SPRINT_STATUS.md` for full sprint details and `REDESIGN_REPORT.md` for Figma redesign implementation notes.
-
----
-
-## Known Issues / Limitations
-
-- No real `.glb` glasses photos — all 55 frames use procedural Three.js geometry
-- Glasses Z-rotation corrected with flat `+Math.PI` — per-model tuning available via `rotationOffset` in `models.json`
-- `vercel --prod` must be run from a local terminal (not from agent contexts)
-- Formspree free tier: 50 pilot form submissions/month
+See `SPRINT_STATUS.md` for full sprint details and CEO action items.
