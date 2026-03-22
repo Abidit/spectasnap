@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 
 const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function NewPasswordPage() {
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [mismatch, setMismatch] = useState(false);
@@ -35,6 +37,8 @@ export default function NewPasswordPage() {
       const { error: authError } = await supabase.auth.updateUser({ password });
       if (authError) { setError(authError.message); return; }
       setDone(true);
+      // Auto-redirect to dashboard after showing success state
+      setTimeout(() => { router.push('/dashboard'); }, 2000);
     } finally {
       setLoading(false);
     }
