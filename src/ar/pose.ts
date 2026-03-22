@@ -162,14 +162,14 @@ export interface KalmanBank {
  * Q = process noise (higher = follow movement faster).
  */
 export function createKalmanBank(): KalmanBank {
-  // Clean build: reduced Q values → 50% less jitter (smoother tracking)
+  // Lower R = trusts live measurements more → faster response, still smooth
   return {
-    cx:    new KalmanFilter({ R: 0.008, Q: 1.0 }),
-    cy:    new KalmanFilter({ R: 0.008, Q: 1.0 }),
-    ipd:   new KalmanFilter({ R: 0.005, Q: 0.5 }),
-    pitch: new KalmanFilter({ R: 0.01,  Q: 1.5 }),
-    yaw:   new KalmanFilter({ R: 0.01,  Q: 1.5 }),
-    roll:  new KalmanFilter({ R: 0.006, Q: 1.0 }),
+    cx:    new KalmanFilter({ R: 0.003, Q: 2.0 }),
+    cy:    new KalmanFilter({ R: 0.003, Q: 2.0 }),
+    ipd:   new KalmanFilter({ R: 0.002, Q: 1.0 }),
+    pitch: new KalmanFilter({ R: 0.004, Q: 3.0 }),
+    yaw:   new KalmanFilter({ R: 0.004, Q: 3.0 }),
+    roll:  new KalmanFilter({ R: 0.003, Q: 2.0 }),
   };
 }
 

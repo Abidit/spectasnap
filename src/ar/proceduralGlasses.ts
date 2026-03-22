@@ -276,26 +276,27 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   rightGlare.userData.role = 'glare';
   group.add(rightGlare);
 
-  // Secondary micro-glare — small bright catchlight dot
+  // Secondary micro-glare — small bright catchlight dot (inside lens boundary)
   const dotShape = new THREE.Shape();
-  dotShape.absellipse(0, 0, preset.lensWidth * 0.08, preset.lensHeight * 0.06, 0, Math.PI * 2, false, 0);
+  dotShape.absellipse(0, 0, preset.lensWidth * 0.06, preset.lensHeight * 0.05, 0, Math.PI * 2, false, 0);
   const dotGeo = new THREE.ShapeGeometry(dotShape, 8);
   const dotMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.22,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
   });
 
   const leftDot = new THREE.Mesh(dotGeo, dotMat);
-  leftDot.position.set(-halfIPD - preset.lensWidth * 0.25, preset.lensHeight * 0.35, lensZ + 0.006);
+  // Keep inside lens: offset inward from centre by 30% of lens width
+  leftDot.position.set(-halfIPD + preset.lensWidth * 0.3, preset.lensHeight * 0.3, lensZ + 0.006);
   leftDot.userData.role = 'glare';
   group.add(leftDot);
 
   const rightDot = new THREE.Mesh(dotGeo, dotMat);
-  rightDot.position.set(halfIPD + preset.lensWidth * 0.25, preset.lensHeight * 0.35, lensZ + 0.006);
+  rightDot.position.set(halfIPD - preset.lensWidth * 0.3, preset.lensHeight * 0.3, lensZ + 0.006);
   rightDot.userData.role = 'glare';
   group.add(rightDot);
 
@@ -339,6 +340,10 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   shadow.rotation.x = -Math.PI / 2;
   shadow.userData.role = 'shadow';
   group.add(shadow);
+
+  // Flip Y to correct shape orientation — ExtrudeGeometry extrudes in +Z
+  // which inverts the shape's Y axis relative to screen/camera space.
+  group.scale.y = -1;
 
   return group;
 }
