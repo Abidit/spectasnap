@@ -2,11 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --gold-500: #C9A96E;
+  --gold-600: #A8844A;
+  --gold-100: #F7EDD8;
+  --cream-50:  #FDFAF4;
+  --cream-100: #F5F0E8;
+  --cream-200: #EDE8DC;
+  --cream-400: #DDD8CE;
+  --ink-900:   #1A1612;
+  --ink-500:   #6B6560;
+  --ink-300:   #9A9490;
+  --dark:      #0A0A0A;
+}
+
 @layer base {
   html, body {
-    background-color: #F5F0E8;
-    color: #1A1612;
-    font-family: 'DM Sans', system-ui, sans-serif;
+    background-color: var(--cream-100);
+    color: var(--ink-900);
+    font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
@@ -26,6 +40,6 @@
     display: none;
   }
   .font-serif {
-    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-family: var(--font-cormorant-garamond, 'Cormorant Garamond', Georgia, serif);
   }
 }

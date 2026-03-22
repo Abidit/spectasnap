@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function NewPasswordPage() {
   const [password, setPassword] = useState('');
@@ -9,22 +12,32 @@ export default function NewPasswordPage() {
   const [mismatch, setMismatch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMismatch(false);
+    setError('');
 
     if (password !== confirm) {
       setMismatch(true);
       return;
     }
 
-    setLoading(true);
-    // Auth integration deferred — stub
-    setTimeout(() => {
-      setLoading(false);
+    if (!SUPABASE_CONFIGURED) {
       setDone(true);
-    }, 1000);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.updateUser({ password });
+      if (authError) { setError(authError.message); return; }
+      setDone(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -137,6 +150,12 @@ export default function NewPasswordPage() {
                     </p>
                   )}
                 </div>
+
+                {error && (
+                  <p className="font-sans text-xs mb-4" style={{ color: '#dc2626' }}>
+                    {error}
+                  </p>
+                )}
 
                 <button
                   type="submit"

@@ -83,11 +83,6 @@ function getFallbackRecs(faceShape: string | null | undefined): AIRec[] {
       { frameId: 'featured-round',    frameName: 'Featured Round',    reason: 'Wide frames break up a longer face shape',        confidence: 'Great choice'  },
       { frameId: 'cat-eye-01',        frameName: 'Cat-Eye 01',        reason: 'Horizontal emphasis creates pleasing proportion', confidence: 'Worth trying'  },
     ],
-    Diamond: [
-      { frameId: 'featured-cat-eye',  frameName: 'Featured Cat-Eye',  reason: 'Highlights cheekbones and your unique angles',    confidence: 'Perfect match' },
-      { frameId: 'rectangle-01',      frameName: 'Rectangle 01',      reason: 'Clean lines complement your defined features',    confidence: 'Great choice'  },
-      { frameId: 'featured-round',    frameName: 'Featured Round',    reason: 'Balances prominent cheekbones softly',            confidence: 'Worth trying'  },
-    ],
   };
   return map[shape] ?? map['Oval'];
 }

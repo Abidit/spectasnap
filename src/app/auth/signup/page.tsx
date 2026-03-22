@@ -2,8 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
+
+const SUPABASE_CONFIGURED = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function SignupPage() {
+  const router = useRouter();
   const [storeName, setStoreName] = useState('');
   const [yourName, setYourName] = useState('');
   const [email, setEmail] = useState('');
@@ -11,13 +16,26 @@ export default function SignupPage() {
   const [city, setCity] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!agreed) return;
+    if (!SUPABASE_CONFIGURED) return;
     setLoading(true);
-    // Auth integration deferred — stub
-    setTimeout(() => setLoading(false), 1000);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { store_name: storeName, full_name: yourName, city } },
+      });
+      if (authError) { setError(authError.message); return; }
+      router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

@@ -1,8 +1,9 @@
 # SpectaSnap Sprint Status
 
-**Current:** Overnight Build — Sprints 3–5 + Final 🚧
-**Last Updated:** 2026-03-21
+**Current:** Continue Build — Auth + Data + Tokens ✅ Complete
+**Last Updated:** 2026-03-22
 **Live URL:** https://spectasnap-orpin.vercel.app
+**Branch:** `claude/continue-build` — PR open against `main`
 
 ---
 
@@ -12,10 +13,11 @@
 |--------|-------|--------|
 | Sprint 1 | Core AR Experience (/trydemo) | ✅ Complete — PR #15 |
 | Sprint 2 | Store Owner Tools (/dashboard + AI Stylist) | ✅ Complete — PR #16 |
-| Sprint 3 | Landing Page & Share | 🚧 In Progress |
-| Sprint 4 | Catalog, QR, Error Handling | 🚧 In Progress |
-| Sprint 5 | Session Tracking & Sales Files | 🚧 In Progress |
-| Final | Auth Screens & Onboarding | 🚧 In Progress |
+| Sprint 3 | Landing Page & Share | ✅ Complete — PR #17 |
+| Sprint 4 | Catalog, QR, Error Handling | ✅ Complete — PR #17 |
+| Sprint 5 | Session Tracking & Sales Files | ✅ Complete — PR #17 |
+| Final | Auth Screens & Onboarding | ✅ Complete — PR #17 |
+| Continue | Auth Wiring + Real Data + Tokens | ✅ Complete — PR open |
 
 ---
 
@@ -77,8 +79,26 @@
 
 ---
 
-## Final 🚧 — Auth Screens & Onboarding
-**Branch:** `claude/overnight-build`
+## Continue Build ✅ — Auth Wiring + Real Data + Tokens
+**Branch:** `claude/continue-build`
+
+- [x] Diamond → Oblong fix (6 files, 0 Diamond refs remain)
+- [x] Dashboard: real `/api/stats` data + 30s auto-refresh + skeleton/error/empty states
+- [x] Supabase auth infrastructure (`supabase.ts`, `supabase-server.ts`, `middleware.ts`)
+- [x] Auth forms fully wired: login, signup, reset-password, new-password
+- [x] TrialBanner component (3 states: early/late/ended)
+- [x] PaywallModal component (isOpen gate, gold CTA, ghost link)
+- [x] TopBar updated: `showTrial` + `trialDaysLeft` props → renders TrialBanner
+- [x] Route protection: admin → 404, protected → login redirect, auth + user → dashboard redirect
+- [x] Design tokens: CSS vars in `:root` globals.css
+- [x] Inter font via `next/font/google` (no `<link>` tags, DM Sans removed)
+- [x] `yarn tsc --noEmit` → 0 errors
+- [x] `yarn build` → 0 errors, 27 routes
+
+---
+
+## Final ✅ — Auth Screens & Onboarding
+**Branch:** `claude/overnight-build` (PR #17)
 
 - [x] `/auth/login`: Two-column (dark panel + form), email + password
 - [x] `/auth/signup`: Two-column, all fields + terms checkbox
@@ -90,6 +110,17 @@
 ---
 
 ## CEO Actions Required
+
+### 0. Supabase Project → Full Auth goes live
+```
+1. Go to https://supabase.com → New Project
+2. Add env vars to Vercel:
+   NEXT_PUBLIC_SUPABASE_URL = https://[project].supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJ...
+3. Enable Google OAuth in Supabase → Auth → Providers → Google
+4. Set redirect URL to: https://spectasnap-orpin.vercel.app/auth/callback
+5. Run: vercel --prod
+```
 
 ### 1. ANTHROPIC_API_KEY → AI Stylist goes live
 ```
