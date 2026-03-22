@@ -217,7 +217,7 @@ export default function PricingPage() {
         </p>
 
         {/* Monthly / Annual toggle */}
-        <div className="flex items-center gap-4 mt-8 justify-center">
+        <div className="flex items-center justify-center gap-3 mt-8">
           <div
             className="flex border border-cream-400 p-0.5"
             style={{ borderRadius: 2, backgroundColor: '#FDFAF4' }}

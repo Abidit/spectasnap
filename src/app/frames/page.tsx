@@ -155,7 +155,6 @@ function Badge({ type }: { type: 'TRENDING' | 'NEW ARRIVAL' | 'LIMITED' }) {
 // ── Frame card ────────────────────────────────────────────────────────────────
 
 function FrameCard({ frame }: { frame: CatalogFrame }) {
-  // Decide if the card bg is light (use dark ink schematic) or dark (use gold schematic)
   const isLightBg = ['#E8E3DA', '#F0EAD8', '#F5EFE8'].includes(frame.bgColor);
 
   return (
@@ -235,7 +234,7 @@ function EmptyState({ onClear }: { onClear: () => void }) {
       <button
         onClick={onClear}
         className="font-sans text-xs font-semibold uppercase tracking-[0.08em] px-4 py-2
-                   bg-ink-900 text-cream-50 transition-colors hover:bg-ink-500"
+                   bg-ink-900 text-cream-50 transition-colors hover:opacity-90"
         style={{ borderRadius: 2 }}
       >
         Clear Filters
@@ -275,7 +274,7 @@ export default function FramesPage() {
       <Sidebar />
 
       <div className="flex flex-col flex-1 min-w-0">
-        <TopBar pageTitle="Frames" />
+        <TopBar pageTitle="Frame Catalog" />
 
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
 

@@ -12,9 +12,6 @@ const PROTECTED_ROUTES = [
   '/settings',
 ];
 
-// Routes that are always public — no auth redirect
-const PUBLIC_ROUTES = ['/', '/trydemo', '/pricing', '/embed'];
-
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
