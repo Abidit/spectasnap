@@ -171,7 +171,7 @@ function buildLensGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
     lensWidth: Math.max(0.01, preset.lensWidth - preset.rimThickness * 1.1),
     lensHeight: Math.max(0.01, preset.lensHeight - preset.rimThickness * 1.1),
   });
-  return new THREE.ExtrudeGeometry(shape, {
+  const geo = new THREE.ExtrudeGeometry(shape, {
     depth: 0.004,
     bevelEnabled: true,
     bevelSize: 0.0008,
@@ -180,6 +180,9 @@ function buildLensGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
     curveSegments: 20,
     steps: 1,
   });
+  // Rotate geometry so shape faces the camera correctly in screen space
+  geo.rotateX(Math.PI);
+  return geo;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +199,7 @@ function buildRimGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
   });
   outer.holes.push(inner);
 
-  return new THREE.ExtrudeGeometry(outer, {
+  const geo = new THREE.ExtrudeGeometry(outer, {
     depth: 0.007,
     bevelEnabled: true,
     bevelSize: 0.0015,
@@ -205,6 +208,9 @@ function buildRimGeometry(preset: ProceduralPreset): THREE.ExtrudeGeometry {
     curveSegments: 24,
     steps: 1,
   });
+  // Rotate geometry so shape faces the camera correctly in screen space
+  geo.rotateX(Math.PI);
+  return geo;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,30 +282,6 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   rightGlare.userData.role = 'glare';
   group.add(rightGlare);
 
-  // Secondary micro-glare — small bright catchlight dot (inside lens boundary)
-  const dotShape = new THREE.Shape();
-  dotShape.absellipse(0, 0, preset.lensWidth * 0.06, preset.lensHeight * 0.05, 0, Math.PI * 2, false, 0);
-  const dotGeo = new THREE.ShapeGeometry(dotShape, 8);
-  const dotMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.22,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-  });
-
-  const leftDot = new THREE.Mesh(dotGeo, dotMat);
-  // Keep inside lens: offset inward from centre by 30% of lens width
-  leftDot.position.set(-halfIPD + preset.lensWidth * 0.3, preset.lensHeight * 0.3, lensZ + 0.006);
-  leftDot.userData.role = 'glare';
-  group.add(leftDot);
-
-  const rightDot = new THREE.Mesh(dotGeo, dotMat);
-  rightDot.position.set(halfIPD - preset.lensWidth * 0.3, preset.lensHeight * 0.3, lensZ + 0.006);
-  rightDot.userData.role = 'glare';
-  group.add(rightDot);
-
   // ── Bridge ─────────────────────────────────────────────────────────────────
   const bridgeGeo = new THREE.BoxGeometry(
     preset.bridgeWidth,
@@ -340,10 +322,6 @@ export function createProceduralGlasses(preset: ProceduralPreset): THREE.Group {
   shadow.rotation.x = -Math.PI / 2;
   shadow.userData.role = 'shadow';
   group.add(shadow);
-
-  // Flip Y to correct shape orientation — ExtrudeGeometry extrudes in +Z
-  // which inverts the shape's Y axis relative to screen/camera space.
-  group.scale.y = -1;
 
   return group;
 }
