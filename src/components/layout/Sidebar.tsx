@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
   Camera, LayoutDashboard, Glasses, Upload,
-  QrCode, FileText, Settings, HelpCircle, LogOut,
+  QrCode, FileText, Settings,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -20,11 +20,11 @@ const TOP_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Frames',    href: '/frames',    icon: Glasses },
   { label: 'Upload',    href: '/upload',    icon: Upload },
+  { label: 'QR Code',   href: '/qr',        icon: QrCode },
+  { label: 'One-Pager', href: '/onepager',  icon: FileText },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
-  { label: 'QR Code',   href: '/qr',        icon: QrCode },
-  { label: 'One-Pager', href: '/onepager',  icon: FileText },
   { label: 'Settings',  href: '/dashboard', icon: Settings },
 ];
 
@@ -73,13 +73,18 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     >
       {/* Logo area — aligns with TopBar height */}
       <div
-        className="flex items-center flex-shrink-0 px-3 border-b border-cream-400"
-        style={{ height: 56 }}
+        className="flex flex-col justify-center px-3 border-b border-cream-400"
+        style={{ height: 64 }}
       >
         {!collapsed && (
-          <span className="font-serif text-base font-semibold text-ink-900">
-            Specta<em className="text-gold-500 not-italic italic">Snap</em>
-          </span>
+          <>
+            <span className="font-serif text-base font-semibold text-ink-900">
+              Specta<em className="text-gold-500 not-italic italic">Snap</em>
+            </span>
+            <span className="text-[9px] font-sans font-semibold uppercase tracking-[0.14em] text-ink-300 mt-0.5">
+              Digital Curator
+            </span>
+          </>
         )}
       </div>
 
@@ -98,26 +103,6 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         {BOTTOM_NAV.map((item) => (
           <NavLink key={item.href} item={item} collapsed={collapsed} />
         ))}
-
-        <Link
-          href="/help"
-          title={collapsed ? 'Help Center' : undefined}
-          className="flex items-center gap-3 h-10 px-3 rounded-sharp text-sm text-ink-300
-                     hover:bg-cream-200 hover:text-ink-500 transition-colors border-l-2 border-transparent no-underline"
-        >
-          <HelpCircle size={18} className="flex-shrink-0" />
-          {!collapsed && <span>Help Center</span>}
-        </Link>
-
-        <button
-          onClick={() => {}}
-          title={collapsed ? 'Sign Out' : undefined}
-          className="flex items-center gap-3 h-10 px-3 rounded-sharp text-sm text-ink-300
-                     hover:bg-cream-200 hover:text-ink-500 transition-colors border-l-2 border-transparent w-full"
-        >
-          <LogOut size={18} className="flex-shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
-        </button>
       </nav>
     </aside>
   );
